@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+pnpm exec prettier --write .
+# Re-add potentially reformatted files
+git add -A 
