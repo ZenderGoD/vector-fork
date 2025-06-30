@@ -45,8 +45,11 @@ function CreateTeamDialogContent({
 
   const createMutation = trpc.team.create.useMutation({
     onSuccess: (result) => {
-      // Refresh teams list so the UI updates
-      utils.organization.listTeams.invalidate({ orgSlug }).catch(() => {});
+      // Refresh teams list (both full and paged) so the UI updates
+      Promise.all([
+        utils.organization.listTeams.invalidate({ orgSlug }),
+        utils.organization.listTeamsPaged.invalidate({ orgSlug }),
+      ]).catch(() => {});
       onSuccess?.(result.id);
       onClose();
     },
@@ -198,7 +201,7 @@ export function CreateTeamDialog({
       <Button
         size="sm"
         onClick={() => setIsDialogOpen(true)}
-        className={cn("gap-1 text-sm", className)}
+        className={cn("gap-1 rounded-sm text-sm", className)}
         variant="outline"
       >
         <Plus className="size-4" />

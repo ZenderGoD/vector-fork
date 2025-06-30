@@ -111,7 +111,7 @@ export function ProjectsTable({
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.2 }}
               key={project.id}
-              className="hover:bg-muted/50 flex items-center gap-3 px-3 py-2 transition-colors"
+              className="hover:bg-muted/50 flex items-center gap-2 px-3 py-1.5 transition-colors"
             >
               {/* Status Selector */}
               <StatusSelector

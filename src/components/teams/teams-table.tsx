@@ -43,7 +43,10 @@ export function TeamsTable({
   const utils = trpc.useUtils();
   const updateIconMutation = trpc.team.update.useMutation({
     onSuccess: () => {
-      utils.organization.listTeams.invalidate({ orgSlug }).catch(() => {});
+      Promise.all([
+        utils.organization.listTeams.invalidate({ orgSlug }),
+        utils.organization.listTeamsPaged.invalidate({ orgSlug }),
+      ]).catch(() => {});
     },
   });
 

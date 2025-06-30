@@ -161,6 +161,28 @@ export const organizationRouter = createTRPCRouter({
       return OrganizationService.getOrganizationTeams(input.orgSlug);
     }),
 
+  // New paginated teams endpoint -------------------------------------------------
+  listTeamsPaged: protectedProcedure
+    .input(
+      z.object({
+        orgSlug: z.string(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const membership = await OrganizationService.verifyUserOrganizationAccess(
+        getUserId(ctx),
+        input.orgSlug,
+      );
+      if (!membership) throw new Error("FORBIDDEN");
+      return OrganizationService.getTeamsPaged(
+        input.orgSlug,
+        input.page,
+        input.pageSize,
+      );
+    }),
+
   listProjects: protectedProcedure
     .input(z.object({ orgSlug: z.string() }))
     .query(async ({ input, ctx }) => {

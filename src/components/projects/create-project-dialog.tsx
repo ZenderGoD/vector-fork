@@ -227,7 +227,7 @@ export function CreateProjectDialog({
       <Button
         size="sm"
         onClick={() => setIsDialogOpen(true)}
-        className={cn("gap-1 text-sm", className)}
+        className={cn("gap-1 rounded-sm text-sm", className)}
         variant="outline"
       >
         <Plus className="size-4" />

@@ -73,7 +73,7 @@ export default async function SettingsLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="bg-background m-2 ml-0 flex-1 overflow-y-auto rounded border">
+      <main className="bg-background m-2 ml-0 flex-1 overflow-y-auto rounded-md border">
         {children}
       </main>
     </div>

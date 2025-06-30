@@ -201,19 +201,11 @@ export function StatesPageContent({ orgSlug }: StatesPageContentProps) {
   );
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-base font-semibold">States & Workflow</h1>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Configure issue states and project statuses for your organization
-        </p>
-      </div>
-
+    <div className="p-4">
       {/* Issue States Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Settings2 className="text-muted-foreground size-5" />
             <h2 className="text-lg font-semibold">Issue States</h2>
           </div>
@@ -295,9 +287,9 @@ export function StatesPageContent({ orgSlug }: StatesPageContentProps) {
       </div>
 
       {/* Project Statuses Section */}
-      <div className="space-y-4">
+      <div className="mt-20 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Clock className="text-muted-foreground size-5" />
             <h2 className="text-lg font-semibold">Project Statuses</h2>
           </div>

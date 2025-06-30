@@ -204,8 +204,8 @@ export function ProjectsPageContent({ orgSlug }: ProjectsPageContentProps) {
   }
 
   return (
-    <div className="bg-background h-full overflow-hidden">
-      <div className="flex h-full flex-col">
+    <div className="bg-background h-full">
+      <div className="flex flex-col">
         {/* Header with tabs and create button */}
         <div className="flex items-center justify-between border-b p-1">
           <div className="flex items-center gap-1">

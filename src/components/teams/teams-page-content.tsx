@@ -15,22 +15,26 @@ interface TeamsPageContentProps {
 export function TeamsPageContent({
   orgSlug,
   isAdminOrOwner,
-  orgName,
+  orgName: _orgName,
 }: TeamsPageContentProps) {
-  const { data: teams = [], isLoading } = trpc.organization.listTeams.useQuery({
-    orgSlug,
-  });
-
   // --------------------------------------------------
-  // Pagination (client-side until server support exists)
+  // Pagination (server-side)
   // --------------------------------------------------
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
 
-  const total = teams.length;
-  const paginatedTeams = teams.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pagedQuery = trpc.organization.listTeamsPaged.useQuery({
+    orgSlug,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
-  // Keep page within valid bounds when data changes (e.g. after create)
+  const teams = [...(pagedQuery.data?.teams ?? [])];
+  const total = pagedQuery.data?.total ?? 0;
+
+  const isLoading = pagedQuery.isLoading;
+
+  // Ensure page stays within bounds when total changes
   useEffect(() => {
     if (page !== 1 && (page - 1) * PAGE_SIZE >= total) {
       setPage(1);
@@ -45,7 +49,10 @@ export function TeamsPageContent({
 
   const deleteMutation = trpc.team.delete.useMutation({
     onSuccess: () => {
-      utils.organization.listTeams.invalidate({ orgSlug }).catch(() => {});
+      Promise.all([
+        utils.organization.listTeams.invalidate({ orgSlug }),
+        utils.organization.listTeamsPaged.invalidate({ orgSlug }),
+      ]).catch(() => {});
     },
   });
 
@@ -93,38 +100,36 @@ export function TeamsPageContent({
       <div className="flex-1">
         <TeamsTable
           orgSlug={orgSlug}
-          teams={paginatedTeams}
+          teams={teams}
           onDelete={isAdminOrOwner ? handleDelete : undefined}
           deletePending={deleteMutation.isPending}
         />
       </div>
 
       {/* Pagination controls */}
-      {total > PAGE_SIZE && (
-        <div className="text-muted-foreground flex justify-between border-t p-2 text-xs">
-          <span>
-            Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Prev
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page * PAGE_SIZE >= total}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
+      <div className="text-muted-foreground flex justify-between border-t p-2 text-xs">
+        <span>
+          Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Prev
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page * PAGE_SIZE >= total}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

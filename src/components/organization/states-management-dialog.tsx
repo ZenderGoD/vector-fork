@@ -29,6 +29,8 @@ import {
   ChevronsUpDown,
   Plus,
   Users,
+  SquareDashedKanban,
+  SquareDashed,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -278,7 +280,9 @@ export function StatesManagementDialog({
     }
   };
 
-  const IconComponent = icon ? getDynamicIcon(icon) || Users : Users;
+  const IconComponent = icon
+    ? getDynamicIcon(icon) || SquareDashed
+    : SquareDashed;
 
   return (
     <Dialog open onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
@@ -346,7 +350,7 @@ export function StatesManagementDialog({
               Delete
             </Button>
           )}
-          <div className="flex gap-2">
+          <div className="ml-auto flex gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               Cancel
             </Button>

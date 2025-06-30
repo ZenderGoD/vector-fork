@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
-import { Users } from "lucide-react";
+import { SquareDashed, Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { IconPicker } from "@/components/ui/icon-picker";
 import {
@@ -143,7 +143,9 @@ export function PrioritiesManagementDialog({
     deleteMutation.mutate({ orgSlug, priorityId: priority.id });
   };
 
-  const IconComponent = icon ? getDynamicIcon(icon) || Users : Users;
+  const IconComponent = icon
+    ? getDynamicIcon(icon) || SquareDashed
+    : SquareDashed;
 
   return (
     <Dialog open onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
@@ -210,7 +212,7 @@ export function PrioritiesManagementDialog({
               Delete
             </Button>
           )}
-          <div className="flex gap-2">
+          <div className="ml-auto flex gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               Cancel
             </Button>

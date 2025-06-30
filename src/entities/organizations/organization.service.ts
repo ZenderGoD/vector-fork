@@ -616,4 +616,46 @@ export class OrganizationService {
 
     return { projects: projectsRows, total, counts } as const;
   }
+
+  /**
+   * Paginated teams list (mirrors structure of getProjectsPaged but simpler)
+   */
+  static async getTeamsPaged(orgSlug: string, page = 1, pageSize = 25) {
+    // Resolve slug → organization id
+    const orgRow = await db
+      .select({ id: organization.id })
+      .from(organization)
+      .where(eq(organization.slug, orgSlug))
+      .limit(1);
+
+    const orgId = orgRow[0]?.id;
+    if (!orgId) return { teams: [], total: 0 } as const;
+
+    // Main paged query – ordered by newest first (createdAt desc)
+    const teamsRows = await db
+      .select({
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        key: team.key,
+        icon: team.icon,
+        color: team.color,
+        createdAt: team.createdAt,
+      })
+      .from(team)
+      .where(eq(team.organizationId, orgId))
+      .orderBy(desc(team.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    // Total count for pagination controls
+    const totalRows = await db
+      .select({ cnt: count() })
+      .from(team)
+      .where(eq(team.organizationId, orgId));
+
+    const total = totalRows[0]?.cnt ?? 0;
+
+    return { teams: teamsRows, total } as const;
+  }
 }
