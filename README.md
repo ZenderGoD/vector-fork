@@ -75,8 +75,8 @@ pnpm install
 # 2. Spin up Postgres
 pnpm dlx --yes docker compose -f docker-compose.dev-postgres.yml up -d
 
-# 3. Create a .env.local (see below)
-cp .env.local.example .env.local
+# 3. Copy env template and tweak values
+cp sample.env .env.local
 
 # 4. Generate & push initial schema
 pnpm run db:generate
@@ -106,7 +106,7 @@ Then open <http://localhost:3000>.
 ## 6 Environment Variables
 
 Managed & validated in `src/env.ts` (Zod).  
-Create a `.env.local` at the repo root:
+Start by copying `sample.env` to `.env.local` at the repo root, then adjust values as needed:
 
 ```bash
 BETTER_AUTH_SECRET=replace_me
@@ -127,7 +127,7 @@ The dev Postgres container lives in `docker-compose.dev-postgres.yml`.
 pnpm dlx --yes docker compose -f docker-compose.dev-postgres.yml up -d
 ```
 
-Default credentials (see `.env.local.example`):
+Default credentials (see `sample.env`):
 
 | user    | password | db    | port |
 | ------- | -------- | ----- | ---- |
