@@ -71,15 +71,6 @@ export default function IssuesPage() {
     },
   });
 
-  const assignMutation = trpc.issue.assign.useMutation({
-    onSuccess: () => {
-      Promise.all([
-        utils.organization.listIssues.invalidate({ orgSlug }),
-        utils.organization.listIssuesPaged.invalidate({ orgSlug }),
-      ]).catch(() => {});
-    },
-  });
-
   const updateAssigneesMutation = trpc.issue.updateAssignees.useMutation({
     onSuccess: () => {
       Promise.all([
@@ -140,15 +131,6 @@ export default function IssuesPage() {
       issueId,
       actorId: session.user.id,
       priorityId,
-    });
-  };
-
-  const handleAssigneeChange = (issueId: string, assigneeId: string) => {
-    if (!session?.user?.id) return;
-    assignMutation.mutate({
-      issueId,
-      actorId: session.user.id,
-      assigneeId: assigneeId || null,
     });
   };
 
@@ -275,7 +257,7 @@ export default function IssuesPage() {
           </div>
 
           {/* Global filters and create button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {/* Team filter */}
             <TeamSelector
               teams={teams}
@@ -309,7 +291,6 @@ export default function IssuesPage() {
           teams={teams}
           projects={projects}
           onPriorityChange={handlePriorityChange}
-          onAssigneeChange={handleAssigneeChange}
           onAssigneesChange={handleAssigneesChange}
           onTeamChange={handleTeamChange}
           onProjectChange={handleProjectChange}
