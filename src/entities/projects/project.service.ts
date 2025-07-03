@@ -37,6 +37,10 @@ export type CreateProjectParams =
     Required<Pick<ProjectInsertModel, "organizationId" | "name" | "key">> & {
       /** Optional array of team IDs; falls back to single `teamId` for legacy */
       teamIds?: string[];
+      /** Optional icon name (Lucide) */
+      icon?: string | null;
+      /** Optional hex color */
+      color?: string | null;
     };
 
 export interface UpdateProjectParams {
@@ -51,6 +55,8 @@ export interface UpdateProjectParams {
       | "dueDate"
       | "statusId"
       | "teamId"
+      | "icon"
+      | "color"
     >
   >;
 }
@@ -78,6 +84,8 @@ export async function createProject(
     startDate,
     dueDate,
     statusId,
+    icon,
+    color,
     teamIds = teamId ? [teamId] : [],
     createdBy,
   } = params;
@@ -151,6 +159,8 @@ export async function createProject(
       name,
       key: params.key,
       description,
+      icon,
+      color,
       leadId,
       createdBy,
       startDate: formatDateForDb(startDate),
@@ -325,6 +335,8 @@ export async function findProjectByKey(
       key: projectTable.key,
       name: projectTable.name,
       description: projectTable.description,
+      icon: projectTable.icon,
+      color: projectTable.color,
       organizationId: projectTable.organizationId,
       createdAt: projectTable.createdAt,
       updatedAt: projectTable.updatedAt,

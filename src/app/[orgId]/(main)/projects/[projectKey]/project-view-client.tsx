@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { ArrowLeft, Save, X } from "lucide-react";
+import { ArrowLeft, Save, X, Plus, FolderOpen } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,16 +20,37 @@ import { usePermission } from "@/hooks/use-permissions";
 import { PERMISSIONS } from "@/auth/permission-constants";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { IconPicker } from "@/components/ui/icon-picker";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { getDynamicIcon } from "@/lib/dynamic-icons";
 
 interface ProjectViewClientProps {
   params: { orgId: string; projectKey: string };
 }
+
+// Default colors for project customization
+const DEFAULT_COLORS = [
+  "#94a3b8", // slate-400
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#ef4444", // red-500
+  "#8b5cf6", // violet-500
+  "#06b6d4", // cyan-500
+  "#6b7280", // gray-500
+];
 
 export default function ProjectViewClient({ params }: ProjectViewClientProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [descriptionValue, setDescriptionValue] = useState("");
+  const [iconValue, setIconValue] = useState<string | null>(null);
+  const [colorValue, setColorValue] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -118,6 +139,26 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
     },
   });
 
+  const updateIconMutation = trpc.project.update.useMutation({
+    onSuccess: () => {
+      projectQuery.refetch();
+      toast.success("Project icon updated");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update icon: ${error.message}`);
+    },
+  });
+
+  const updateColorMutation = trpc.project.update.useMutation({
+    onSuccess: () => {
+      projectQuery.refetch();
+      toast.success("Project color updated");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update color: ${error.message}`);
+    },
+  });
+
   // Event handlers
   const handleTitleSave = () => {
     if (!project) return;
@@ -165,6 +206,24 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
     });
   };
 
+  const handleIconChange = (iconName: string | null) => {
+    if (!project) return;
+    setIconValue(iconName);
+    updateIconMutation.mutate({
+      id: project.id,
+      data: { icon: iconName },
+    });
+  };
+
+  const handleColorChange = (color: string) => {
+    if (!project) return;
+    setColorValue(color);
+    updateColorMutation.mutate({
+      id: project.id,
+      data: { color },
+    });
+  };
+
   const project = projectQuery.data;
   const statuses = statusesQuery.data || [];
   const teams = teamsQuery.data || [];
@@ -189,6 +248,14 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
       router.replace("/403");
     }
   }, [projectQuery.error, router]);
+
+  // Initialize icon and color values when project loads
+  useEffect(() => {
+    if (project) {
+      setIconValue(project.icon || null);
+      setColorValue(project.color || null);
+    }
+  }, [project]);
 
   if (projectQuery.isLoading) {
     return (
@@ -295,7 +362,82 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
 
             {/* Title */}
             {editingTitle ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {/* Icon that stays visible during editing */}
+                {canEdit ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-0 transition-opacity hover:opacity-80">
+                        {iconValue ? (
+                          (() => {
+                            const IconComp = getDynamicIcon(iconValue);
+                            if (!IconComp)
+                              return (
+                                <FolderOpen className="text-muted-foreground size-6" />
+                              );
+                            return (
+                              <IconComp
+                                className="size-6"
+                                style={{ color: colorValue || undefined }}
+                              />
+                            );
+                          })()
+                        ) : (
+                          <div className="border-muted-foreground/50 flex size-6 items-center justify-center rounded border-2 border-dashed">
+                            <Plus className="text-muted-foreground size-3" />
+                          </div>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="start">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="mb-2 text-sm font-medium">
+                            Project Icon
+                          </h4>
+                          <IconPicker
+                            value={iconValue}
+                            onValueChange={handleIconChange}
+                            placeholder="Select project icon"
+                            className="h-8 w-full"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="mb-2 text-sm font-medium">
+                            Project Color
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {DEFAULT_COLORS.map((colorOption) => (
+                              <button
+                                key={colorOption}
+                                type="button"
+                                className={`size-8 rounded-md border-2 transition-all ${
+                                  colorValue === colorOption
+                                    ? "border-foreground scale-110"
+                                    : "border-border hover:scale-105"
+                                }`}
+                                style={{ backgroundColor: colorOption }}
+                                onClick={() => handleColorChange(colorOption)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  iconValue &&
+                  (() => {
+                    const IconComp = getDynamicIcon(iconValue);
+                    if (!IconComp) return null;
+                    return (
+                      <IconComp
+                        className="size-6"
+                        style={{ color: colorValue || undefined }}
+                      />
+                    );
+                  })()
+                )}
                 <Input
                   value={titleValue}
                   onChange={(e) => setTitleValue(e.target.value)}
@@ -331,14 +473,91 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
                 </div>
               </div>
             ) : (
-              <h1
-                className={cn(
-                  "text-3xl leading-tight font-semibold transition-colors",
-                  canEdit && "hover:text-muted-foreground cursor-pointer",
+              <h1 className="flex items-center gap-2 text-3xl leading-tight font-semibold">
+                {/* Clickable Icon with Color */}
+                {canEdit ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-0 transition-opacity hover:opacity-80">
+                        {iconValue ? (
+                          (() => {
+                            const IconComp = getDynamicIcon(iconValue);
+                            if (!IconComp)
+                              return (
+                                <FolderOpen className="text-muted-foreground size-6" />
+                              );
+                            return (
+                              <IconComp
+                                className="size-6"
+                                style={{ color: colorValue || undefined }}
+                              />
+                            );
+                          })()
+                        ) : (
+                          <div className="border-muted-foreground/50 flex size-6 items-center justify-center rounded border-2 border-dashed">
+                            <Plus className="text-muted-foreground size-3" />
+                          </div>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="start">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="mb-2 text-sm font-medium">
+                            Project Icon
+                          </h4>
+                          <IconPicker
+                            value={iconValue}
+                            onValueChange={handleIconChange}
+                            placeholder="Select project icon"
+                            className="h-8 w-full"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="mb-2 text-sm font-medium">
+                            Project Color
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {DEFAULT_COLORS.map((colorOption) => (
+                              <button
+                                key={colorOption}
+                                type="button"
+                                className={`size-8 rounded-md border-2 transition-all ${
+                                  colorValue === colorOption
+                                    ? "border-foreground scale-110"
+                                    : "border-border hover:scale-105"
+                                }`}
+                                style={{ backgroundColor: colorOption }}
+                                onClick={() => handleColorChange(colorOption)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  iconValue &&
+                  (() => {
+                    const IconComp = getDynamicIcon(iconValue);
+                    if (!IconComp) return null;
+                    return (
+                      <IconComp
+                        className="size-6"
+                        style={{ color: colorValue || undefined }}
+                      />
+                    );
+                  })()
                 )}
-                onClick={() => canEdit && setEditingTitle(true)}
-              >
-                {project.name}
+                <span
+                  className={cn(
+                    "transition-colors",
+                    canEdit && "hover:text-muted-foreground cursor-pointer",
+                  )}
+                  onClick={() => canEdit && setEditingTitle(true)}
+                >
+                  {project.name}
+                </span>
               </h1>
             )}
           </div>

@@ -133,6 +133,8 @@ export const projectRouter = createTRPCRouter({
         startDate: z.string().optional(), // ISO
         dueDate: z.string().optional(),
         statusId: z.string().uuid().optional(),
+        icon: z.string().nullable().optional(),
+        color: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -164,6 +166,8 @@ export const projectRouter = createTRPCRouter({
         startDate: input.startDate,
         dueDate: input.dueDate,
         statusId: input.statusId,
+        icon: input.icon,
+        color: input.color,
         createdBy: userId,
       });
       return { id } as const;
@@ -180,6 +184,8 @@ export const projectRouter = createTRPCRouter({
           startDate: z.string().optional(),
           dueDate: z.string().optional(),
           statusId: z.string().uuid().optional(),
+          icon: z.string().nullable().optional(),
+          color: z.string().nullable().optional(),
         }),
       }),
     )

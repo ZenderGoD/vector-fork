@@ -56,6 +56,10 @@ export const project = pgTable(
     key: text("key").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    /** Optional icon name (Lucide) */
+    icon: text("icon"),
+    /** Optional hex color */
+    color: text("color"),
     /** Owning team (optional – projects can span teams) */
     teamId: uuid("team_id").references(() => team.id, { onDelete: "set null" }),
     leadId: text("lead_id").references(() => user.id, { onDelete: "set null" }),
