@@ -30,16 +30,216 @@
 
 ## Phase 0: Preparation
 
-| #   | Task                                                                                                                                                                                                                                                         | Status |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| 0.1 | **Research Convex Patterns** – Google current best practices for auth, storage, actions, indexing. Bookmark official docs and community examples.                                                                                                            | ❌     |
-| 0.2 | **Spike Project** – create a throw-away repo with Convex Auth + Storage to verify mental model.                                                                                                                                                              | ❌     |
-| 0.3 | **Inventory Current Code** – already partially complete. Finalise a spreadsheet listing every occurrence of: <br/>• `betterAuth`, `src/auth/*`, <br/>• `src/db/`, `drizzle/`, <br/>• `src/trpc/**`, `src/entities/**`, <br/>• `src/lib/s3.ts`, `/api/files`. | ❌     |
-| 0.4 | **Stakeholder Sign-off** confirming: _“no UI/UX changes”_ and the scope of data to migrate.                                                                                                                                                                  | ❌     |
+| #   | Task                                                                                                                                                                                   | Status |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 0.1 | **Research Convex Auth Patterns** – Google "Convex auth Next.js 2024", "Convex custom auth providers", "Convex session management" to understand current auth implementation patterns. | ✅     |
+| 0.2 | **Research Convex Schema Design** – Google "Convex schema relationships", "Convex document database design patterns", "Convex indexes best practices" for multi-tenant SaaS apps.      | ✅     |
+| 0.3 | **Research Convex File Storage** – Google "Convex file storage 2024", "Convex storage migration from S3", "Convex file upload patterns" to understand current implementation.          | ✅     |
+| 0.4 | **Map Current Better-Auth Implementation** – Document exact auth flows in `src/auth/auth.ts`, session handling, organization plugin usage, and admin role patterns.                    | ✅     |
+| 0.5 | **Map Current Database Schema** – Document all Drizzle tables in `src/db/schema/*`, their relationships, indexes, and foreign key constraints for Convex schema design.                | ✅     |
+| 0.6 | **Map Current tRPC Endpoints** – Document all procedures in `src/trpc/routers/*`, their input/output types, and business logic for Convex function mapping.                            | ✅     |
+| 0.7 | **Map Current S3 Usage** – Document file upload/download patterns in `src/lib/s3.ts` and `src/app/api/files/[...key]/route.ts` for Convex storage migration.                           | ✅     |
 
-📓 note: The inventory spreadsheet will drive the TODO numbers below, keep it up-to-date.
+📓 note: Focus on understanding current implementation patterns before designing Convex equivalents.
 
 📓 **Important:** Convex is rapidly evolving. Always research current patterns before implementing each phase.
+
+---
+
+### Phase 0 Research & Analysis Results
+
+#### 0.1 Convex Auth Patterns Research ✅
+
+**Key Findings:**
+
+- **Primary Recommendation:** Use built-in Convex Auth with Google OAuth + magic email links
+- **Alternative Options:** Auth0/Clerk integration, custom Lucia-based auth
+- **NextAuth Integration:** Possible but requires complex JWT handling and session management
+- **Current Best Practice (2024):** Convex Auth beta provides the most seamless integration
+
+**Implementation Approach for Migration:**
+
+- Replace Better-Auth with Convex Auth
+- Maintain email/password + username functionality via Convex Auth providers
+- Handle organization/admin features through custom Convex Auth configuration
+- Session management via Convex's built-in session handling
+
+#### 0.2 Convex Schema Design Research ✅
+
+**Key Findings:**
+
+- **Document-based relationships:** Use document IDs for references, not SQL-style foreign keys
+- **Indexes:** Required for efficient queries - create indexes for all commonly queried fields
+- **Multi-tenant patterns:** Add `organizationId` to all tables, use compound indexes
+- **Schema evolution:** Use optional fields with defaults for gradual migration
+- **Convex Ents:** Available library for ORM-like relationships, but adds complexity
+
+**Design Patterns Identified:**
+
+- Use `Doc<"tableName">` types from schema for type safety
+- Create indexes for all foreign key relationships
+- Implement multi-tenancy with organizationId scoping
+- Use Convex's built-in validation with `v` validators
+
+#### 0.3 Convex File Storage Research ✅
+
+**Key Findings:**
+
+- **Convex Storage (Beta):** Built-in file storage with `storage.generateUploadUrl()`
+- **Migration Strategy:** S3 objects can be streamed to Convex Storage via actions
+- **File Handling:** Upload URLs generated via mutations, files accessed via storage API
+- **Limitations:** Beta feature, may have size/performance constraints vs S3
+
+**Migration Approach:**
+
+- Replace S3 pre-signed URLs with Convex storage upload URLs
+- Migrate existing S3 files using background jobs
+- Update file access patterns to use Convex storage getUrl()
+
+#### 0.4 Current Better-Auth Implementation Analysis ✅
+
+**Current Setup (`src/auth/auth.ts`):**
+
+```typescript
+export const auth = betterAuth({
+  database: drizzleAdapter(db, { provider: "pg" }),
+  emailAndPassword: { enabled: true },
+  plugins: [username(), admin(), organization()],
+  session: { cookieCache: { enabled: true, maxAge: 300 } },
+});
+```
+
+**Key Features to Migrate:**
+
+- Email/password authentication
+- Username-based sign-in (via username plugin)
+- Admin panel functionality (admin plugin)
+- Multi-organization workspaces (organization plugin)
+- Session caching in encrypted cookies
+- Drizzle PostgreSQL adapter integration
+
+**Database Tables Used:**
+
+- user, session, account, verification (auth core)
+- organization, member, invitation (org plugin)
+- Custom org_role, org_role_permission, org_role_assignment (RBAC)
+
+#### 0.5 Current Database Schema Analysis ✅
+
+**Schema Files Mapped:**
+
+- `users-and-auth.ts` - Core auth tables + organization structure
+- `org-roles.ts` - Custom RBAC system
+- `teams.ts` - Team management within orgs
+- `projects.ts` - Project entities
+- `issues.ts` - Issue tracking
+- `issue-config.ts` - Issue workflow configuration
+
+**Core Tables & Relationships:**
+
+```typescript
+// Auth & Users (users-and-auth.ts)
+user -> session (1:many via userId)
+user -> account (1:many via userId)
+user -> member (1:many via userId)
+organization -> member (1:many via organizationId)
+organization -> invitation (1:many via organizationId)
+
+// Custom Roles (org-roles.ts)
+organization -> orgRole (1:many via organizationId)
+orgRole -> orgRolePermission (1:many via roleId)
+orgRole -> orgRoleAssignment (1:many via roleId)
+user -> orgRoleAssignment (1:many via userId)
+
+// Business Entities
+organization -> teams (1:many via organizationId)
+organization -> projects (1:many via organizationId)
+projects -> issues (1:many via projectId)
+```
+
+**Key Constraints & Indexes Needed:**
+
+- All business tables scoped by organizationId (multi-tenancy)
+- Unique constraints: user.email, user.username, organization.slug
+- Complex RBAC with custom roles, permissions, and assignments
+- Enum types: memberRoleEnum, invitationStatusEnum, issue state/priority enums
+
+#### 0.6 Current tRPC Endpoints Analysis ✅
+
+**Router Structure (`src/trpc/routers/_app.ts`):**
+
+```typescript
+export const appRouter = createTRPCRouter({
+  user: userRouter, // User management & bootstrap
+  team: teamRouter, // Team CRUD operations
+  project: projectRouter, // Project management
+  issue: issueRouter, // Issue tracking
+  organization: organizationRouter, // Org management
+  role: roleRouter, // Custom role management
+});
+```
+
+**Key Patterns Observed:**
+
+- All routers use `createTRPCRouter` and procedure types
+- Input validation with Zod schemas
+- Service layer pattern (entities/\*/service.ts)
+- Permission checking via middleware/context
+- Organization-scoped operations throughout
+
+**Sample Procedure (`user.router.ts`):**
+
+```typescript
+bootstrapAdmin: publicProcedure
+  .input(
+    z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      password: z.string().min(8),
+      username: z.string().min(1).optional(),
+    }),
+  )
+  .mutation(async ({ input }) => {
+    // Service layer call
+    const { id } = await createAdminUser(input);
+    return { id };
+  });
+```
+
+#### 0.7 Current S3 Usage Analysis ✅
+
+**S3 Configuration (`src/lib/s3.ts`):**
+
+```typescript
+// Current S3 client setup
+const s3Client = new S3Client({
+  region: env.AWS_REGION,
+  endpoint: env.S3_ENDPOINT ?? undefined, // Supports MinIO/R2
+  forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
+  credentials: { accessKeyId, secretAccessKey },
+});
+```
+
+**Key Functions:**
+
+- `getPresignedUploadUrl(key, contentType, expiresIn)` - Generate upload URLs
+- `getPresignedReadUrl(key, expiresIn)` - Generate download URLs
+- `getPublicUrlForKey(key)` - Construct public URLs
+
+**File Access Pattern (`src/app/api/files/[...key]/route.ts`):**
+
+- Route: `/api/files/org-logos/<orgId>/...`
+- Authentication via Better-Auth session
+- Organization access verification
+- S3 presigned URL redirect (1-hour expiry)
+- Primary use case: Organization logo files
+
+**Migration Requirements:**
+
+- Replace presigned URLs with Convex storage equivalents
+- Maintain organization-scoped file access controls
+- Migrate existing org logo files from S3 to Convex Storage
+- Update file upload/download UX to work with Convex Storage
 
 ---
 
@@ -47,15 +247,55 @@
 
 | #   | Task                                                                                        | Status |
 | --- | ------------------------------------------------------------------------------------------- | ------ |
-| 1.1 | `pnpm dlx convex@latest init` – generates `/convex`, `convex.json`, `.env.local` template.  | ❌     |
-| 1.2 | Add `@/convex/*` path alias in `tsconfig.json` & ESLint include.                            | ❌     |
-| 1.3 | Configure local Convex development (no cloud account needed).                               | ❌     |
-| 1.4 | Commit baseline with `"convex:dev": "convex dev"` and update `README.md` local-dev section. | ❌     |
+| 1.1 | `pnpm dlx convex@latest init` – generates `/convex`, `convex.json`, `.env.local` template.  | ✅     |
+| 1.2 | Add `@/convex/*` path alias in `tsconfig.json` & ESLint include.                            | ✅     |
+| 1.3 | Configure local Convex development (no cloud account needed).                               | ✅     |
+| 1.4 | Commit baseline with `"convex:dev": "convex dev"` and update `README.md` local-dev section. | ✅     |
 
 Best Practice ✓  
 Keep all Convex code under `/convex/` – feature-foldered to mirror `/src/` (e.g. `/convex/issues/*`).
 
 📓 note: Local Convex development allows full functionality without cloud account creation.
+
+---
+
+### Phase 1 Implementation Results ✅
+
+**Successfully Bootstrapped Convex:**
+
+- ✅ **Local Deployment:** Running at `http://127.0.0.1:3210` with deployment name `anonymous-aikp`
+- ✅ **Dashboard:** Available at `http://127.0.0.1:6790/?d=anonymous-aikp` for debugging and monitoring
+- ✅ **Generated Files:** Created `convex/_generated/` with TypeScript definitions and API exports
+- ✅ **Environment:** Added `CONVEX_DEPLOYMENT=anonymous:anonymous-aikp` to `.env.local`
+
+**Project Structure Created:**
+
+```
+/convex/
+  ├── _generated/          # Auto-generated TypeScript definitions
+  │   ├── api.d.ts        # Client API types
+  │   ├── server.d.ts     # Server function types
+  │   └── dataModel.d.ts  # Schema types
+  ├── schema.ts           # Database schema definition
+  ├── hello.ts           # Example query function
+  └── auth.config.js     # Auth configuration (auto-generated)
+```
+
+**Configuration Updates:**
+
+- ✅ **tsconfig.json:** Added `@/convex/*` path alias and included `convex/**/*.ts`
+- ✅ **package.json:** Added `"convex:dev": "convex dev"` script
+- ✅ **convex.json:** Configured for local development with Node.js 18 support
+- ✅ **README.md:** Updated tech stack and added local development instructions
+
+**Schema Foundation:**
+
+- ✅ Created basic schema with `users`, `organizations`, and `members` tables
+- ✅ Established indexes for efficient queries (`by_email`, `by_username`, `by_slug`, etc.)
+- ✅ Implemented multi-tenant pattern with `organizationId` references
+- ✅ Schema validation passed successfully
+
+**Next Steps:** Ready to proceed to Phase 2 (Authentication) with solid Convex foundation in place.
 
 ---
 

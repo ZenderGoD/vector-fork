@@ -19,6 +19,31 @@ All documentation for this project, including setup guides, architectural overvi
 | Runtime     | **Next.js 15** (App Router, React 19)     |
 | Language    | **TypeScript strict**                     |
 | Styling     | **Tailwind CSS 4** + cva + tailwind-merge |
-| ORM         | **Drizzle ORM** (PostgreSQL)              |
+| Database    | **Convex** (local development)            |
+| Legacy ORM  | **Drizzle ORM** (PostgreSQL) - migrating  |
 | Auth        | **better-auth** (NextAuth-inspired)       |
 | Package Mgr | **pnpm**                                  |
+
+## Local Development
+
+### Convex Backend
+
+```bash
+# Start the local Convex development server
+pnpm run convex:dev
+
+# View the Convex dashboard
+# http://localhost:6790/?d=anonymous-aikp
+```
+
+### Next.js Frontend
+
+```bash
+# Start the Next.js development server
+pnpm run dev
+
+# Visit the application
+# http://localhost:3000
+```
+
+**Note:** Both Convex and Next.js need to be running simultaneously during development.

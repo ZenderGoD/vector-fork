@@ -11,7 +11,8 @@
     "db:auth:generate": "pnpm dlx @better-auth/cli generate --config src/auth/auth.ts --output src/db/schema/users-and-auth.ts",
     "db:push": "drizzle-kit push:pg",
     "prepare": "husky install && echo '✅ Husky git hooks installed'",
-    "project:setup": "tsx scripts/project-setup.ts"
+    "project:setup": "tsx scripts/project-setup.ts",
+    "convex:dev": "convex dev"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.840.0",
@@ -36,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "convex": "^1.25.4",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.6",
