@@ -70,17 +70,22 @@ export function IssueAssignments({
   );
 
   // Fetch assignments for this issue
-  const assignments = useQuery(api.issues.getAssignments, { issueId }) ?? [];
+  const assignments =
+    useQuery(api.issues.queries.getAssignments, {
+      issueId,
+    }) ?? [];
 
   // Mutations
-  const addAssigneeMutation = useMutation(api.issues.addAssignee);
+  const addAssigneeMutation = useMutation(api.issues.mutations.addAssignee);
   const changeAssignmentStateMutation = useMutation(
-    api.issues.changeAssignmentState
+    api.issues.mutations.changeAssignmentState
   );
   const updateAssignmentAssigneeMutation = useMutation(
-    api.issues.updateAssignmentAssignee
+    api.issues.mutations.updateAssignmentAssignee
   );
-  const deleteAssignmentMutation = useMutation(api.issues.deleteAssignment);
+  const deleteAssignmentMutation = useMutation(
+    api.issues.mutations.deleteAssignment
+  );
 
   // Helper to filter members so the same user cannot be assigned twice
   const assignedUserIds = assignments

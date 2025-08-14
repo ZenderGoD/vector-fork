@@ -58,23 +58,31 @@ export default function IssuesPage() {
   const [isUpdatingAssignmentStates, setIsUpdatingAssignmentStates] =
     useState(false);
 
-  const deleteMutation = useMutation(api.issues.deleteIssue);
-  const changePriorityMutation = useMutation(api.issues.changePriority);
-  const updateAssigneesMutation = useMutation(api.issues.updateAssignees);
-  const changeTeamMutation = useMutation(api.issues.changeTeam);
-  const changeProjectMutation = useMutation(api.issues.changeProject);
+  const deleteMutation = useMutation(api.issues.mutations.deleteIssue);
+  const changePriorityMutation = useMutation(
+    api.issues.mutations.changePriority
+  );
+  const updateAssigneesMutation = useMutation(
+    api.issues.mutations.updateAssignees
+  );
+  const changeTeamMutation = useMutation(api.issues.mutations.changeTeam);
+  const changeProjectMutation = useMutation(api.issues.mutations.changeProject);
   const changeAssignmentStateMutation = useMutation(
-    api.issues.changeAssignmentState
+    api.issues.mutations.changeAssignmentState
   );
 
-  const states = useQuery(api.organizations.listIssueStates, { orgSlug });
-  const priorities = useQuery(api.organizations.listIssuePriorities, {
+  const states = useQuery(api.organizations.queries.listIssueStates, {
     orgSlug,
   });
-  const teams = useQuery(api.organizations.listTeams, { orgSlug });
-  const projects = useQuery(api.organizations.listProjects, { orgSlug });
+  const priorities = useQuery(api.organizations.queries.listIssuePriorities, {
+    orgSlug,
+  });
+  const teams = useQuery(api.organizations.queries.listTeams, { orgSlug });
+  const projects = useQuery(api.organizations.queries.listProjects, {
+    orgSlug,
+  });
 
-  const { issues, total, counts } = useQuery(api.issues.listIssues, {
+  const { issues, total, counts } = useQuery(api.issues.queries.listIssues, {
     orgSlug,
     projectId: selectedProject || undefined,
     teamId: selectedTeam || undefined,

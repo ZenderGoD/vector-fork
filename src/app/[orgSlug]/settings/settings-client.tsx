@@ -19,8 +19,10 @@ export default function OrgSettingsPageClient({
 }: OrgSettingsPageClientProps) {
   const params = useParams();
   const orgSlugParam = params.orgSlug as string;
-  const org = useQuery(api.organizations.getBySlug, { orgSlug: orgSlugParam });
-  const members = useQuery(api.organizations.listMembersWithRoles, {
+  const org = useQuery(api.organizations.queries.getBySlug, {
+    orgSlug: orgSlugParam,
+  });
+  const members = useQuery(api.organizations.queries.listMembersWithRoles, {
     orgSlug: orgSlugParam,
   });
   const user = useQuery(api.users.currentUser);

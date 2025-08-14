@@ -19,8 +19,12 @@ export default function OrgSettingsLayout({
   const params = useParams();
   const orgSlug = params.orgSlug as string;
   const user = useQuery(api.users.currentUser);
-  const members = useQuery(api.organizations.listMembersWithRoles, { orgSlug });
-  const organization = useQuery(api.organizations.getBySlug, { orgSlug });
+  const members = useQuery(api.organizations.queries.listMembersWithRoles, {
+    orgSlug,
+  });
+  const organization = useQuery(api.organizations.queries.getBySlug, {
+    orgSlug,
+  });
   const userOrganizations = useQuery(api.users.getOrganizations);
   const userRole = members?.find(m => m.userId === user?._id)?.role || 'member';
 

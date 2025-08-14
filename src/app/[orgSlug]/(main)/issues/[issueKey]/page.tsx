@@ -135,47 +135,55 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
   const [isUpdatingEstimates, setIsUpdatingEstimates] = useState(false);
 
   const issue = useQuery(
-    api.issues.getByKey,
+    api.issues.queries.getByKey,
     resolvedParams
       ? { orgSlug: resolvedParams.orgSlug, issueKey: resolvedParams.issueKey }
       : 'skip'
   );
 
   const states = useQuery(
-    api.organizations.listIssueStates,
+    api.organizations.queries.listIssueStates,
     resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip'
   );
   const members = useQuery(
-    api.organizations.listMembers,
+    api.organizations.queries.listMembers,
     resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip'
   );
   const teams = useQuery(
-    api.organizations.listTeams,
+    api.organizations.queries.listTeams,
     resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip'
   );
   const projects = useQuery(
-    api.organizations.listProjects,
+    api.organizations.queries.listProjects,
     resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip'
   );
   const priorities = useQuery(
-    api.organizations.listIssuePriorities,
+    api.organizations.queries.listIssuePriorities,
     resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip'
   );
 
-  const updateTitleMutation = useMutation(api.issues.updateTitle);
-  const updateDescriptionMutation = useMutation(api.issues.updateDescription);
-  const updateEstimatesMutation = useMutation(api.issues.updateEstimatedTimes);
-  const changeTeamMutation = useMutation(api.issues.changeTeam);
-  const changeProjectMutation = useMutation(api.issues.changeProject);
-  const changePriorityMutation = useMutation(api.issues.changePriority);
-  const changeAssignmentStateMutation = useMutation(
-    api.issues.changeAssignmentState
+  const updateTitleMutation = useMutation(api.issues.mutations.updateTitle);
+  const updateDescriptionMutation = useMutation(
+    api.issues.mutations.updateDescription
   );
-  const changeVisibilityMutation = useMutation(api.issues.changeVisibility);
-  const updateIssueParentMutation = useMutation(api.issues.update);
+  const updateEstimatesMutation = useMutation(
+    api.issues.mutations.updateEstimatedTimes
+  );
+  const changeTeamMutation = useMutation(api.issues.mutations.changeTeam);
+  const changeProjectMutation = useMutation(api.issues.mutations.changeProject);
+  const changePriorityMutation = useMutation(
+    api.issues.mutations.changePriority
+  );
+  const changeAssignmentStateMutation = useMutation(
+    api.issues.mutations.changeAssignmentState
+  );
+  const changeVisibilityMutation = useMutation(
+    api.issues.mutations.changeVisibility
+  );
+  const updateIssueParentMutation = useMutation(api.issues.mutations.update);
 
   const assignments = useQuery(
-    api.issues.getAssignments,
+    api.issues.queries.getAssignments,
     issue?._id ? { issueId: issue._id } : 'skip'
   );
 

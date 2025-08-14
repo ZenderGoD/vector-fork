@@ -31,11 +31,11 @@ export function OrgSidebar({ orgSlug }: OrgSidebarProps) {
   const pathname = usePathname();
 
   // Fetch user's teams and projects
-  const userTeamsData = useQuery(api.organizations.listTeams, {
+  const userTeamsData = useQuery(api.organizations.queries.listTeams, {
     orgSlug: orgSlug,
   });
 
-  const userProjectsData = useQuery(api.organizations.listProjects, {
+  const userProjectsData = useQuery(api.organizations.queries.listProjects, {
     orgSlug: orgSlug,
   });
 

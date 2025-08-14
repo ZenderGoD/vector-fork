@@ -65,12 +65,14 @@ export function ProjectsPageContent({ orgSlug }: ProjectsPageContentProps) {
   const [page, setPage] = useState(1);
 
   // Queries
-  const projectsData = useQuery(api.projects.list, { orgSlug });
-  const statusesData = useQuery(api.organizations.listProjectStatuses, {
+  const projectsData = useQuery(api.projects.queries.list, { orgSlug });
+  const statusesData = useQuery(api.organizations.queries.listProjectStatuses, {
     orgSlug,
   });
-  const teamsData = useQuery(api.organizations.listTeams, { orgSlug });
-  const membersData = useQuery(api.organizations.listMembers, { orgSlug });
+  const teamsData = useQuery(api.organizations.queries.listTeams, { orgSlug });
+  const membersData = useQuery(api.organizations.queries.listMembers, {
+    orgSlug,
+  });
 
   // Transform data to match expected interfaces
   const projects: ProjectRowData[] = (projectsData ?? []).map(project => ({
@@ -112,10 +114,10 @@ export function ProjectsPageContent({ orgSlug }: ProjectsPageContentProps) {
   }));
 
   // Mutations
-  const changeStatusMutation = useMutation(api.projects.update);
-  const changeTeamMutation = useMutation(api.projects.update);
-  const changeLeadMutation = useMutation(api.projects.update);
-  const deleteMutation = useMutation(api.projects.deleteProject);
+  const changeStatusMutation = useMutation(api.projects.mutations.update);
+  const changeTeamMutation = useMutation(api.projects.mutations.update);
+  const changeLeadMutation = useMutation(api.projects.mutations.update);
+  const deleteMutation = useMutation(api.projects.mutations.deleteProject);
 
   // Event handlers
   const handleStatusChange = (projectId: string, statusId: string) => {

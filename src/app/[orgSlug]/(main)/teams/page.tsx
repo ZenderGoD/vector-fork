@@ -11,7 +11,7 @@ interface TeamsPageProps {
 }
 
 function TeamsPageInner({ orgSlug }: { orgSlug: string }) {
-  const canCreateTeams = useQuery(api.permissions.has, {
+  const canCreateTeams = useQuery(api.permissions.queries.has, {
     orgSlug,
     permission: 'team:create',
   });

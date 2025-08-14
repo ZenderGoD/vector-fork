@@ -19,7 +19,7 @@ export function OrgSetupForm() {
     slug: '',
   });
 
-  const createOrgMutation = useMutation(api.organizations.create);
+  const createOrgMutation = useMutation(api.organizations.mutations.create);
 
   const handleNameChange = (value: string) => {
     setFormData(prev => ({

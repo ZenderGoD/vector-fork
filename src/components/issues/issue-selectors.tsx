@@ -64,21 +64,21 @@ import { Input } from '../ui/input';
 
 // Infer types from Convex query outputs
 export type Team = FunctionReturnType<
-  typeof api.organizations.listTeams
+  typeof api.organizations.queries.listTeams
 >[number];
 export type Project = FunctionReturnType<
-  typeof api.organizations.listProjects
+  typeof api.organizations.queries.listProjects
 >[number];
 export type State = FunctionReturnType<
-  typeof api.organizations.listIssueStates
+  typeof api.organizations.queries.listIssueStates
 >[number];
 export type Member = FunctionReturnType<
-  typeof api.organizations.listMembers
+  typeof api.organizations.queries.listMembers
 >[number];
 export type Priority = FunctionReturnType<
-  typeof api.organizations.listIssuePriorities
+  typeof api.organizations.queries.listIssuePriorities
 >[number];
-export type Issue = FunctionReturnType<typeof api.issues.list>[number];
+export type Issue = FunctionReturnType<typeof api.issues.queries.list>[number];
 
 // ---------------------------------------------------------------------------
 // Display variant for how the button shows icon/label
@@ -968,14 +968,14 @@ export function MultiAssigneeSelector({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Search members with debouncing
-  const searchResults = useQuery(api.organizations.searchMembers, {
+  const searchResults = useQuery(api.organizations.queries.searchMembers, {
     orgSlug,
     query: searchQuery,
     limit: 10,
   });
 
   // Get organization members for display purposes (when we have selections but they're not in search)
-  const allMembers = useQuery(api.organizations.listMembers, {
+  const allMembers = useQuery(api.organizations.queries.listMembers, {
     orgSlug,
   });
 
@@ -1651,7 +1651,7 @@ export function IssueSelector({
   const { viewOnly } = useAccess();
 
   // Fetch issues from the organization
-  const issuesData = useQuery(api.issues.list, {
+  const issuesData = useQuery(api.issues.queries.list, {
     orgSlug,
     parentIssueId: 'root', // Only fetch top-level issues as potential parents
   });

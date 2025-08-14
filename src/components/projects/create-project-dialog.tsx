@@ -63,7 +63,8 @@ function CreateProjectDialogContent({
   const [isLoading, setIsLoading] = useState(false);
 
   // Get teams
-  const teamsData = useQuery(api.organizations.listTeams, { orgSlug }) ?? [];
+  const teamsData =
+    useQuery(api.organizations.queries.listTeams, { orgSlug }) ?? [];
   const teams = teamsData.map(team => ({
     id: team._id,
     name: team.name,
@@ -74,7 +75,7 @@ function CreateProjectDialogContent({
 
   // Get project statuses from organization
   const statusesData =
-    useQuery(api.organizations.listProjectStatuses, { orgSlug }) ?? [];
+    useQuery(api.organizations.queries.listProjectStatuses, { orgSlug }) ?? [];
   const statuses = statusesData.map(status => ({
     _id: status._id,
     name: status.name,
@@ -92,7 +93,7 @@ function CreateProjectDialogContent({
     }
   }, [statuses, selectedStatus]);
 
-  const createMutation = useMutation(api.projects.create);
+  const createMutation = useMutation(api.projects.mutations.create);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

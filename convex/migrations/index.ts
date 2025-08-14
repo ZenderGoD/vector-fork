@@ -1,5 +1,5 @@
-import { mutation } from './_generated/server';
-import { createDefaultTeamRoles, createDefaultProjectRoles } from './roles';
+import { mutation } from '../_generated/server';
+import { createDefaultTeamRoles, createDefaultProjectRoles } from '../roles';
 
 /**
  * Migration to create default roles for existing teams and projects.

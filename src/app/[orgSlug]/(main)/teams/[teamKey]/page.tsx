@@ -89,9 +89,11 @@ function AddMemberDialog({
   const [memberComboboxOpen, setMemberComboboxOpen] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
 
-  const orgMembersQuery = useQuery(api.organizations.listMembers, { orgSlug });
+  const orgMembersQuery = useQuery(api.organizations.queries.listMembers, {
+    orgSlug,
+  });
   const orgMembers = orgMembersQuery.data ?? [];
-  const addMemberMutation = useMutation(api.teams.addMember);
+  const addMemberMutation = useMutation(api.teams.mutations.addMember);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,7 +211,7 @@ function MembersList({
   removePending,
   canEdit,
 }: {
-  members: FunctionReturnType<typeof api.teams.listMembers>;
+  members: FunctionReturnType<typeof api.teams.queries.listMembers>;
   onRemoveMember?: (membershipId: Id<'teamMembers'>) => void;
   removePending?: boolean;
   canEdit: boolean;
@@ -348,7 +350,7 @@ export default function TeamViewPage() {
   const user = userQuery.data;
 
   // Fetch team data
-  const teamQuery = useQuery(api.teams.getByKey, {
+  const teamQuery = useQuery(api.teams.queries.getByKey, {
     orgSlug,
     teamKey,
   });
@@ -356,43 +358,53 @@ export default function TeamViewPage() {
 
   // Fetch team members
   const teamMembersQuery = useQuery(
-    api.teams.listMembers,
+    api.teams.queries.listMembers,
     team?._id ? { teamId: team._id } : 'skip'
   );
   const teamMembers = teamMembersQuery.data ?? [];
 
   // Fetch team issues
   const teamIssuesQuery = useQuery(
-    api.issues.listIssues,
+    api.issues.queries.listIssues,
     team?.key ? { orgSlug, teamId: team.key } : 'skip'
   );
   const teamIssuesData = teamIssuesQuery.data;
 
   // Fetch team projects
   const teamProjectsQuery = useQuery(
-    api.projects.list,
+    api.projects.queries.list,
     team?.key ? { orgSlug, teamId: team.key } : 'skip'
   );
   const teamProjects = teamProjectsQuery.data ?? [];
 
   // Fetch supporting data for tables
-  const statesQuery = useQuery(api.organizations.listIssueStates, { orgSlug });
+  const statesQuery = useQuery(api.organizations.queries.listIssueStates, {
+    orgSlug,
+  });
   const states = statesQuery.data ?? [];
 
-  const prioritiesQuery = useQuery(api.organizations.listIssuePriorities, {
-    orgSlug,
-  });
+  const prioritiesQuery = useQuery(
+    api.organizations.queries.listIssuePriorities,
+    {
+      orgSlug,
+    }
+  );
   const priorities = prioritiesQuery.data ?? [];
 
-  const teamsQuery = useQuery(api.organizations.listTeams, { orgSlug });
+  const teamsQuery = useQuery(api.organizations.queries.listTeams, { orgSlug });
   const teams = teamsQuery.data ?? [];
 
-  const projectsQuery = useQuery(api.organizations.listProjects, { orgSlug });
-  const projects = projectsQuery.data ?? [];
-
-  const statusesQuery = useQuery(api.organizations.listProjectStatuses, {
+  const projectsQuery = useQuery(api.organizations.queries.listProjects, {
     orgSlug,
   });
+  const projects = projectsQuery.data ?? [];
+
+  const statusesQuery = useQuery(
+    api.organizations.queries.listProjectStatuses,
+    {
+      orgSlug,
+    }
+  );
   const statuses = statusesQuery.data ?? [];
 
   // Determine if user can edit team (team lead or has permission)
@@ -406,21 +418,31 @@ export default function TeamViewPage() {
     PERMISSIONS.TEAM_EDIT,
     permissionScope
   ); // Mutations with toast error handling - ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
-  const updateTeamMutation = useMutation(api.teams.update);
-  const deleteMutation = useMutation(api.issues.deleteIssue);
-  const changePriorityMutation = useMutation(api.issues.changePriority);
-  const updateAssigneesMutation = useMutation(api.issues.updateAssignees);
-  const changeTeamMutation = useMutation(api.issues.changeTeam);
-  const changeProjectMutation = useMutation(api.issues.changeProject);
-  const changeAssignmentStateMutation = useMutation(
-    api.issues.changeAssignmentState
+  const updateTeamMutation = useMutation(api.teams.mutations.update);
+  const deleteMutation = useMutation(api.issues.mutations.deleteIssue);
+  const changePriorityMutation = useMutation(
+    api.issues.mutations.changePriority
   );
-  const changeStatusMutation = useMutation(api.projects.changeStatus);
-  const changeProjectTeamMutation = useMutation(api.projects.changeTeam);
-  const changeLeadMutation = useMutation(api.projects.changeLead);
-  const deleteProjectMutation = useMutation(api.projects.deleteProject);
-  const removeMemberMutation = useMutation(api.teams.removeMember);
-  const changeVisibilityMutation = useMutation(api.teams.changeVisibility);
+  const updateAssigneesMutation = useMutation(
+    api.issues.mutations.updateAssignees
+  );
+  const changeTeamMutation = useMutation(api.issues.mutations.changeTeam);
+  const changeProjectMutation = useMutation(api.issues.mutations.changeProject);
+  const changeAssignmentStateMutation = useMutation(
+    api.issues.mutations.changeAssignmentState
+  );
+  const changeStatusMutation = useMutation(api.projects.mutations.changeStatus);
+  const changeProjectTeamMutation = useMutation(
+    api.projects.mutations.changeTeam
+  );
+  const changeLeadMutation = useMutation(api.projects.mutations.changeLead);
+  const deleteProjectMutation = useMutation(
+    api.projects.mutations.deleteProject
+  );
+  const removeMemberMutation = useMutation(api.teams.mutations.removeMember);
+  const changeVisibilityMutation = useMutation(
+    api.teams.mutations.changeVisibility
+  );
 
   // Check if any queries are still loading
   const isLoading =

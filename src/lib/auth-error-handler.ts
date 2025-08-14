@@ -35,15 +35,35 @@ export function extractAuthErrorMessage(error: unknown): string {
     }
 
     if (message.includes('EmailAlreadyExists')) {
-      return 'An account with this email already exists';
+      return 'An account with this email already exists. Please try signing in instead';
+    }
+
+    if (message.includes('UsernameAlreadyExists')) {
+      return 'This username is already taken. Please choose a different one';
     }
 
     if (message.includes('PasswordTooShort')) {
       return 'Password must be at least 8 characters long';
     }
 
+    if (message.includes('PasswordTooWeak')) {
+      return 'Password is too weak. Please include letters and numbers';
+    }
+
     if (message.includes('InvalidEmail')) {
       return 'Please enter a valid email address';
+    }
+
+    if (message.includes('InvalidUsername')) {
+      return 'Username can only contain letters, numbers, hyphens, and underscores';
+    }
+
+    if (message.includes('UsernameTooShort')) {
+      return 'Username must be at least 3 characters long';
+    }
+
+    if (message.includes('UsernameTooLong')) {
+      return 'Username must be less than 20 characters';
     }
 
     if (message.includes('NetworkError') || message.includes('fetch')) {
@@ -66,12 +86,28 @@ export function extractAuthErrorMessage(error: unknown): string {
       return 'Service not found. Please try again later';
     }
 
+    if (message.includes('Too Many Requests') || message.includes('429')) {
+      return 'Too many attempts. Please wait a moment and try again';
+    }
+
+    if (message.includes('Rate Limited')) {
+      return 'Too many signup attempts. Please wait a few minutes before trying again';
+    }
+
     // Handle generic server errors
     if (
       message.includes('Server Error') ||
       message.includes('Internal Server Error')
     ) {
       return 'Server error. Please try again later';
+    }
+
+    // Handle validation errors
+    if (
+      message.includes('Validation failed') ||
+      message.includes('Invalid input')
+    ) {
+      return 'Please check your input and try again';
     }
 
     // Handle stack traces - extract just the first meaningful line
@@ -155,5 +191,39 @@ export function isAuthError(error: unknown): boolean {
     message.includes('UserNotFound') ||
     message.includes('Unauthorized') ||
     message.includes('401')
+  );
+}
+
+/**
+ * Check if error is a signup-specific error
+ */
+export function isSignupError(error: unknown): boolean {
+  if (!error) return false;
+
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('EmailAlreadyExists') ||
+    message.includes('UsernameAlreadyExists') ||
+    message.includes('InvalidUsername') ||
+    message.includes('UsernameTooShort') ||
+    message.includes('UsernameTooLong') ||
+    message.includes('PasswordTooWeak')
+  );
+}
+
+/**
+ * Check if error is a validation error
+ */
+export function isValidationError(error: unknown): boolean {
+  if (!error) return false;
+
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('Validation failed') ||
+    message.includes('Invalid input') ||
+    message.includes('InvalidEmail') ||
+    message.includes('InvalidUsername') ||
+    message.includes('PasswordTooShort') ||
+    message.includes('PasswordTooWeak')
   );
 }

@@ -40,7 +40,7 @@ import { PERMISSIONS } from '@/convex/_shared/permissions';
 
 // Infer issue row type directly from tRPC router output to stay in sync with DB.
 export type IssueRowData = Prettify<
-  FunctionReturnType<typeof api.issues.listIssues>['issues'][number]
+  FunctionReturnType<typeof api.issues.queries.listIssues>['issues'][number]
 >;
 
 export interface IssuesTableProps {

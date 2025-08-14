@@ -23,7 +23,7 @@ export function useScopedPermission(
   const isClient = typeof window !== 'undefined';
 
   const hasPermission = useQuery(
-    api.permissions.has,
+    api.permissions.queries.has,
     scope.orgSlug && permission && isClient
       ? {
           orgSlug: scope.orgSlug,
@@ -64,7 +64,7 @@ export function useScopedPermissions(
   const isClient = typeof window !== 'undefined';
 
   const permissionMap = useQuery(
-    api.permissions.hasMultiple,
+    api.permissions.queries.hasMultiple,
     scope.orgSlug && permissions.length > 0 && isClient
       ? {
           orgSlug: scope.orgSlug,

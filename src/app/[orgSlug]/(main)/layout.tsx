@@ -17,7 +17,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // Fetch current user and organization data
   const user = useQuery(api.users.currentUser);
-  const organization = useQuery(api.organizations.getBySlug, { orgSlug });
+  const organization = useQuery(api.organizations.queries.getBySlug, {
+    orgSlug,
+  });
   const userOrganizations = useQuery(api.users.getOrganizations);
 
   // Don't render until we have the data

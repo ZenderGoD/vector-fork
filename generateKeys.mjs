@@ -1,12 +1,34 @@
-import { exportJWK, exportPKCS8, generateKeyPair } from 'jose';
+'use node';
 
-const keys = await generateKeyPair('RS256', {
-  extractable: true,
+import crypto from 'crypto';
+
+// Generate RSA key pair
+const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  publicKeyEncoding: {
+    type: 'spki',
+    format: 'pem',
+  },
+  privateKeyEncoding: {
+    type: 'pkcs8',
+    format: 'pem',
+  },
 });
-const privateKey = await exportPKCS8(keys.privateKey);
-const publicKey = await exportJWK(keys.publicKey);
-const jwks = JSON.stringify({ keys: [{ use: 'sig', ...publicKey }] });
 
+// Convert public key to JWK format
+const publicKeyBuffer = crypto.createPublicKey(publicKey);
+const jwk = {
+  kty: 'RSA',
+  use: 'sig',
+  alg: 'RS256',
+  n: publicKeyBuffer.export({ format: 'jwk' }).n,
+  e: publicKeyBuffer.export({ format: 'jwk' }).e,
+  kid: crypto.randomBytes(16).toString('hex'),
+};
+
+const jwks = JSON.stringify({ keys: [jwk] });
+
+// Output the keys
 process.stdout.write(
   `JWT_PRIVATE_KEY="${privateKey.trimEnd().replace(/\n/g, ' ')}"`
 );

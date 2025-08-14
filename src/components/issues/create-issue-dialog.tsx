@@ -217,13 +217,22 @@ function CreateIssueDialogContent({
   //   Fetch data (teams, projects, states)
   // ---------------------------------------------
   // Get teams and projects data
-  const teamsData = useQuery(api.organizations.listTeams, { orgSlug });
-  const projectsData = useQuery(api.organizations.listProjects, { orgSlug });
-  const statesData = useQuery(api.organizations.listIssueStates, { orgSlug });
-  const membersData = useQuery(api.organizations.listMembers, { orgSlug });
-  const prioritiesData = useQuery(api.organizations.listIssuePriorities, {
+  const teamsData = useQuery(api.organizations.queries.listTeams, { orgSlug });
+  const projectsData = useQuery(api.organizations.queries.listProjects, {
     orgSlug,
   });
+  const statesData = useQuery(api.organizations.queries.listIssueStates, {
+    orgSlug,
+  });
+  const membersData = useQuery(api.organizations.queries.listMembers, {
+    orgSlug,
+  });
+  const prioritiesData = useQuery(
+    api.organizations.queries.listIssuePriorities,
+    {
+      orgSlug,
+    }
+  );
   const currentUser = useQuery(api.users.currentUser);
 
   // Transform data to maintain frontend compatibility
@@ -304,7 +313,7 @@ function CreateIssueDialogContent({
     setHasUserInteractedWithAssignees(true);
   };
 
-  const createIssueMutation = useMutation(api.issues.create);
+  const createIssueMutation = useMutation(api.issues.mutations.create);
 
   const [isLoading, setIsLoading] = useState(false);
 

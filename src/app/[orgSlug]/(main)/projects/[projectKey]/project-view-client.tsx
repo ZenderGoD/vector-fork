@@ -59,7 +59,7 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
 
   const user = useQuery(api.users.currentUser);
 
-  const project = useQuery(api.projects.getByKey, {
+  const project = useQuery(api.projects.queries.getByKey, {
     orgSlug: params.orgSlug,
     projectKey: params.projectKey,
   });
@@ -83,19 +83,21 @@ export default function ProjectViewClient({ params }: ProjectViewClientProps) {
     (project.leadId === user._id || canEditProject)
   );
 
-  const statuses = useQuery(api.organizations.listProjectStatuses, {
+  const statuses = useQuery(api.organizations.queries.listProjectStatuses, {
     orgSlug: params.orgSlug,
   });
 
-  const teams = useQuery(api.organizations.listTeams, {
+  const teams = useQuery(api.organizations.queries.listTeams, {
     orgSlug: params.orgSlug,
   });
 
-  const updateMutation = useMutation(api.projects.update);
-  const changeStatusMutation = useMutation(api.projects.changeStatus);
-  const changeTeamMutation = useMutation(api.projects.changeTeam);
-  const changeLeadMutation = useMutation(api.projects.changeLead);
-  const changeVisibilityMutation = useMutation(api.projects.changeVisibility);
+  const updateMutation = useMutation(api.projects.mutations.update);
+  const changeStatusMutation = useMutation(api.projects.mutations.changeStatus);
+  const changeTeamMutation = useMutation(api.projects.mutations.changeTeam);
+  const changeLeadMutation = useMutation(api.projects.mutations.changeLead);
+  const changeVisibilityMutation = useMutation(
+    api.projects.mutations.changeVisibility
+  );
 
   const handleTitleSave = () => {
     if (!project) return;

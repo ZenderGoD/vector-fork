@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "prepare": "husky install && echo '✅ Husky git hooks installed'",
     "project:setup": "tsx scripts/project-setup.ts",
-    "convex:dev": "convex dev"
+    "convex:dev": "convex dev",
+    "generate:keys": "node generateKeys.mjs"
   },
   "dependencies": {
     "@auth/core": "0.37.0",

@@ -3,11 +3,11 @@ import {
   query,
   type QueryCtx,
   type MutationCtx,
-} from './_generated/server';
+} from '../_generated/server';
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { v, ConvexError } from 'convex/values';
-import { Id, Doc } from './_generated/dataModel';
-import { PERMISSIONS, requirePermission } from './permissions';
+import { Id, Doc } from '../_generated/dataModel';
+import { PERMISSIONS, requirePermission } from '../permissions/utils';
 
 // -----------------------------------------------------------------------------
 // Default Role Creation

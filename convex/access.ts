@@ -18,7 +18,7 @@ import {
   type Permission,
   type PermissionScope,
   type VisibilityState,
-} from './permissions';
+} from './permissions/utils';
 
 // -----------------------------------------------------------------------------
 // Generic Permission Helpers
