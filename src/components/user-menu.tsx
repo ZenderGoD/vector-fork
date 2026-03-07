@@ -12,13 +12,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, LogOut, User, Settings } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  LogOut,
+  Moon,
+  Settings,
+  Sun,
+  User,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { UserAvatar } from '@/components/user-avatar';
+import { useTheme } from 'next-themes';
 
 export function UserMenu() {
   const user = useQuery(api.users.currentUser);
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === 'dark';
 
   if (user === undefined || user === null) {
     return null;
@@ -55,6 +65,14 @@ export function UserMenu() {
         <DropdownMenuItem onClick={() => router.push('/settings')}>
           <Settings className='mr-2 size-3.5' />
           <span>Settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(isDark ? 'light' : 'dark')}>
+          {isDark ? (
+            <Sun className='mr-2 size-3.5' />
+          ) : (
+            <Moon className='mr-2 size-3.5' />
+          )}
+          <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push('/auth/sign-out')}>
