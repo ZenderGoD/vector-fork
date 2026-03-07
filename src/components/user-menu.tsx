@@ -13,7 +13,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ChevronsUpDown, LogOut, User, Settings } from 'lucide-react';
-import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 
 export function UserMenu() {
@@ -23,10 +22,6 @@ export function UserMenu() {
   if (user === undefined || user === null) {
     return null;
   }
-
-  const handleSignOut = async () => {
-    await authClient.signOut();
-  };
 
   return (
     <DropdownMenu>
@@ -58,7 +53,7 @@ export function UserMenu() {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => void handleSignOut()}>
+        <DropdownMenuItem onClick={() => router.push('/auth/sign-out')}>
           <LogOut className='mr-2 size-3.5' />
           <span>Log out</span>
         </DropdownMenuItem>
