@@ -616,6 +616,7 @@ export const addAssignee = mutation({
     issueId: v.id('issues'),
     assigneeId: v.id('users'),
     stateId: v.optional(v.id('issueStates')),
+    note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -664,6 +665,7 @@ export const addAssignee = mutation({
       issueId: args.issueId,
       assigneeId: args.assigneeId,
       stateId,
+      note: args.note,
     });
 
     const assignee = await ctx.db.get('users', args.assigneeId);
