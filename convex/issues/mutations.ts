@@ -105,6 +105,7 @@ export const create = mutation({
       stateId: v.optional(v.id('issueStates')),
       priorityId: v.optional(v.id('issuePriorities')),
       assigneeIds: v.optional(v.array(v.id('users'))),
+      labelIds: v.optional(v.array(v.id('issueLabels'))),
       parentIssueId: v.optional(v.id('issues')),
       visibility: v.optional(
         v.union(
@@ -185,6 +186,15 @@ export const create = mutation({
       throw new ConvexError('INVALID_INPUT');
     }
 
+    if (args.data.labelIds) {
+      const labels = await Promise.all(
+        args.data.labelIds.map(labelId => ctx.db.get('issueLabels', labelId)),
+      );
+      if (labels.some(label => !label || label.organizationId !== org._id)) {
+        throw new ConvexError('INVALID_LABEL');
+      }
+    }
+
     const workflowStateId =
       args.data.stateId ?? (await resolveDefaultWorkflowStateId(ctx, org._id));
 
@@ -239,6 +249,13 @@ export const create = mutation({
           stateId: assigneeStateId,
         });
       }
+    }
+
+    for (const labelId of Array.from(new Set(args.data.labelIds ?? []))) {
+      await ctx.db.insert('issueLabelAssignments', {
+        issueId,
+        labelId,
+      });
     }
 
     const createdIssue = await ctx.db.get('issues', issueId);
@@ -602,6 +619,58 @@ export const addComment = mutation({
     }
 
     return { commentId } as const;
+  },
+});
+
+export const updateLabels = mutation({
+  args: {
+    issueId: v.id('issues'),
+    labelIds: v.array(v.id('issueLabels')),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new ConvexError('UNAUTHORIZED');
+    }
+
+    const issue = await ctx.db.get('issues', args.issueId);
+    if (!issue) {
+      throw new ConvexError('ISSUE_NOT_FOUND');
+    }
+
+    if (!(await canEditIssue(ctx, issue))) {
+      throw new ConvexError('FORBIDDEN');
+    }
+
+    const uniqueLabelIds = Array.from(new Set(args.labelIds));
+    const labels = await Promise.all(
+      uniqueLabelIds.map(labelId => ctx.db.get('issueLabels', labelId)),
+    );
+    if (
+      labels.some(
+        label => !label || label.organizationId !== issue.organizationId,
+      )
+    ) {
+      throw new ConvexError('INVALID_LABEL');
+    }
+
+    const existingAssignments = await ctx.db
+      .query('issueLabelAssignments')
+      .withIndex('by_issue', q => q.eq('issueId', issue._id))
+      .collect();
+
+    for (const assignment of existingAssignments) {
+      await ctx.db.delete('issueLabelAssignments', assignment._id);
+    }
+
+    for (const labelId of uniqueLabelIds) {
+      await ctx.db.insert('issueLabelAssignments', {
+        issueId: issue._id,
+        labelId,
+      });
+    }
+
+    return { success: true } as const;
   },
 });
 

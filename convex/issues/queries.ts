@@ -8,6 +8,23 @@ import { PERMISSIONS, type Permission } from '../permissions/utils';
 import { isDefined } from '../_shared/typeGuards';
 import { buildIssueSearchTextFromIssue } from './search';
 
+async function loadIssueLabels(ctx: QueryCtx, issueId: Id<'issues'>) {
+  const assignments = await ctx.db
+    .query('issueLabelAssignments')
+    .withIndex('by_issue', q => q.eq('issueId', issueId))
+    .collect();
+
+  const labels = await Promise.all(
+    assignments.map(assignment =>
+      ctx.db.get('issueLabels', assignment.labelId),
+    ),
+  );
+
+  return labels
+    .filter(isDefined)
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
 export const getByKey = query({
   args: {
     orgSlug: v.string(),
@@ -69,6 +86,7 @@ export const getByKey = query({
     const workflowState = issue.workflowStateId
       ? await ctx.db.get('issueStates', issue.workflowStateId)
       : resolveWorkflowStateFromAssignments(assignees, assigneeStateMap);
+    const labels = await loadIssueLabels(ctx, issue._id);
 
     const childIssues = await ctx.db
       .query('issues')
@@ -118,6 +136,7 @@ export const getByKey = query({
       createdBy: createdByUser,
       priority,
       workflowState,
+      labels,
       children,
     };
   },
@@ -652,6 +671,66 @@ function resolveWorkflowStateFromAssignments(
   return fallbackStateId ? (stateMap.get(fallbackStateId) ?? null) : null;
 }
 
+async function loadIssueLabelsByIssue(
+  ctx: QueryCtx,
+  issueIds: readonly Id<'issues'>[],
+) {
+  const uniqueIssueIds = Array.from(new Set(issueIds));
+  const assignmentsByIssue = await Promise.all(
+    uniqueIssueIds.map(issueId =>
+      ctx.db
+        .query('issueLabelAssignments')
+        .withIndex('by_issue', q => q.eq('issueId', issueId))
+        .collect(),
+    ),
+  );
+
+  const allLabelIds = Array.from(
+    new Set(assignmentsByIssue.flat().map(a => a.labelId)),
+  );
+  const labelDocs = await Promise.all(
+    allLabelIds.map(id => ctx.db.get('issueLabels', id)),
+  );
+  const labelMap = new Map(
+    allLabelIds.flatMap((id, i) => {
+      const doc = labelDocs[i];
+      return doc ? [[id, doc]] : [];
+    }),
+  );
+
+  return new Map(
+    uniqueIssueIds.map((issueId, index) => {
+      const labels = assignmentsByIssue[index]
+        .map(a => labelMap.get(a.labelId))
+        .filter(isDefined)
+        .sort((left, right) => left.name.localeCompare(right.name));
+      return [issueId, labels];
+    }),
+  );
+}
+
+async function loadCommentCountsByIssue(
+  ctx: QueryCtx,
+  issueIds: readonly Id<'issues'>[],
+) {
+  const uniqueIssueIds = Array.from(new Set(issueIds));
+  const commentLists = await Promise.all(
+    uniqueIssueIds.map(issueId =>
+      ctx.db
+        .query('comments')
+        .withIndex('by_issue', q => q.eq('issueId', issueId))
+        .collect(),
+    ),
+  );
+
+  return new Map(
+    uniqueIssueIds.map((issueId, index) => [
+      issueId,
+      commentLists[index].filter(c => !c.deleted).length,
+    ]),
+  );
+}
+
 async function flattenIssueRows(
   ctx: QueryCtx,
   issues: readonly Doc<'issues'>[],
@@ -685,6 +764,7 @@ async function flattenIssueRows(
   const stateIds = assignmentList
     .map(assignment => assignment.stateId)
     .filter((id): id is Id<'issueStates'> => Boolean(id));
+  const issueIds = issues.map(issue => issue._id);
 
   // Load active PR links for all issues in parallel
   const prLinksByIssue = new Map<
@@ -748,6 +828,8 @@ async function flattenIssueRows(
     parentIssueMap,
     assigneeMap,
     stateMap,
+    labelsByIssue,
+    commentCountsByIssue,
   ] = await Promise.all([
     loadDocMap(ctx, 'projects', projectIds),
     loadDocMap(ctx, 'teams', teamIds),
@@ -757,6 +839,8 @@ async function flattenIssueRows(
     loadDocMap(ctx, 'issues', parentIssueIds),
     loadDocMap(ctx, 'users', assigneeIds),
     loadDocMap(ctx, 'issueStates', stateIds),
+    loadIssueLabelsByIssue(ctx, issueIds),
+    loadCommentCountsByIssue(ctx, issueIds),
   ]);
 
   return issues.flatMap(issue => {
@@ -777,6 +861,12 @@ async function flattenIssueRows(
     const parentIssue = issue.parentIssueId
       ? parentIssueMap.get(issue.parentIssueId)
       : null;
+    const labels = (labelsByIssue.get(issue._id) ?? []).map(label => ({
+      _id: label._id,
+      name: label.name,
+      color: label.color,
+    }));
+    const commentCount = commentCountsByIssue.get(issue._id) ?? 0;
 
     const assignments = assignmentsByIssue.get(issue._id) ?? [];
     const hydratedAssignments =
@@ -839,6 +929,8 @@ async function flattenIssueRows(
       reporterName: reporter?.name,
       parentIssueKey: parentIssue?.key,
       linkedPrs,
+      labels,
+      commentCount,
       ...assignment,
     }));
   });
@@ -1359,6 +1451,7 @@ export const listIssues = query({
     projectId: v.optional(v.string()),
     teamId: v.optional(v.string()),
     assigneeId: v.optional(v.string()),
+    labelId: v.optional(v.id('issueLabels')),
     searchQuery: v.optional(v.string()),
     page: v.optional(v.number()),
     pageSize: v.optional(v.number()),
@@ -1430,6 +1523,16 @@ export const listIssues = query({
           ).map(assignment => assignment.issueId),
         )
       : null;
+    const labelIssueIds = args.labelId
+      ? new Set(
+          (
+            await ctx.db
+              .query('issueLabelAssignments')
+              .withIndex('by_label', q => q.eq('labelId', args.labelId!))
+              .collect()
+          ).map(assignment => assignment.issueId),
+        )
+      : null;
     const visibleIssues = candidateIssues
       .filter(issue =>
         canUserViewIssueFromAccess(access, issue, {
@@ -1443,7 +1546,8 @@ export const listIssues = query({
       )
       .filter(issue =>
         assigneeIssueIds ? assigneeIssueIds.has(issue._id) : true,
-      );
+      )
+      .filter(issue => (labelIssueIds ? labelIssueIds.has(issue._id) : true));
 
     const pageSize =
       args.pageSize && args.pageSize > 0

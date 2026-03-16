@@ -17,6 +17,10 @@ import {
   ProjectSelector,
   TeamSelector,
 } from '@/components/issues/issue-selectors';
+import {
+  IssueLabelSelector,
+  type IssueLabel,
+} from '@/components/issues/issue-label-selector';
 import { ISSUE_STATE_DEFAULTS } from '@/lib/defaults';
 import type { Id } from '@/convex/_generated/dataModel';
 import {
@@ -81,6 +85,7 @@ export default function IssuesPage() {
   };
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedTeam, setSelectedTeam] = useState<string>('');
+  const [selectedLabel, setSelectedLabel] = useState<string>('');
   const [searchText, setSearchText] = useState('');
   const deferredSearch = useDeferredValue(searchText);
   const [page, setPage] = useState(1);
@@ -122,12 +127,16 @@ export default function IssuesPage() {
   const projects = useQuery(api.organizations.queries.listProjects, {
     orgSlug,
   });
+  const issueLabels = useQuery(api.organizations.queries.listIssueLabels, {
+    orgSlug,
+  });
 
   const issuesData = useQuery(api.issues.queries.listIssues, {
     orgSlug,
     projectId: selectedProject || undefined,
     teamId: selectedTeam || undefined,
     assigneeId: scopeTab === 'mine' ? currentUserId || undefined : undefined,
+    labelId: selectedLabel ? (selectedLabel as Id<'issueLabels'>) : undefined,
     searchQuery: deferredSearch || undefined,
     page: viewMode === 'table' ? page : undefined,
     pageSize: viewMode === 'table' ? PAGE_SIZE : undefined,
@@ -145,6 +154,7 @@ export default function IssuesPage() {
     projectId: selectedProject || undefined,
     teamId: selectedTeam || undefined,
     assigneeId: scopeTab === 'mine' ? undefined : currentUserId || undefined,
+    labelId: selectedLabel ? (selectedLabel as Id<'issueLabels'>) : undefined,
     searchQuery: deferredSearch || undefined,
     page: 1,
     pageSize: 1,
@@ -155,7 +165,14 @@ export default function IssuesPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [deferredSearch, selectedProject, selectedTeam, activeFilter, scopeTab]);
+  }, [
+    deferredSearch,
+    selectedProject,
+    selectedTeam,
+    selectedLabel,
+    activeFilter,
+    scopeTab,
+  ]);
 
   const handlePriorityChange = (issueId: string, priorityId: string) => {
     if (!user || !priorityId) return;
@@ -403,6 +420,24 @@ export default function IssuesPage() {
                   className='h-6 text-xs'
                 />
               </PermissionAware>
+            </div>
+
+            {/* Label filter - hidden on small screens */}
+            <div className='hidden sm:block'>
+              <IssueLabelSelector
+                labels={issueLabels ?? []}
+                selectedLabelIds={selectedLabel ? [selectedLabel] : []}
+                onSelectionChange={ids => {
+                  // Single-select: take the most recently added id
+                  if (ids.length === 0) {
+                    setSelectedLabel('');
+                  } else {
+                    setSelectedLabel(ids[ids.length - 1]);
+                  }
+                }}
+                displayMode='iconWhenUnselected'
+                className='h-6 text-xs'
+              />
             </div>
 
             <CreateIssueDialog className='h-6' orgSlug={orgSlug} />

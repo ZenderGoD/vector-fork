@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FolderOpen,
   GitPullRequest,
+  MessageSquareMore,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import {
   PrioritySelector,
   MultiAssigneeSelector,
 } from '@/components/issues/issue-selectors';
+import { IssueLabelBadge } from './issue-label-selector';
 import type { IssueRowData } from './issues-table';
 import { CreateIssueDialog } from './create-issue-dialog';
 import {
@@ -111,6 +113,8 @@ interface GroupedIssue {
   }>;
   updatedAt: number;
   linkedPrs: Array<{ number: number; state: string; url: string }>;
+  labels: Array<{ _id: string; name: string; color: string | undefined }>;
+  commentCount: number;
 }
 
 interface KanbanIssueCard extends GroupedIssue {
@@ -216,6 +220,8 @@ export function IssuesKanban({
           assignments: [assignment],
           updatedAt: row.updatedAt ?? 0,
           linkedPrs: row.linkedPrs ?? [],
+          labels: row.labels ?? [],
+          commentCount: row.commentCount ?? 0,
         });
       }
     }
@@ -864,6 +870,20 @@ function KanbanCardContent({
         </p>
       </Link>
 
+      {/* Labels */}
+      {issue.labels && issue.labels.length > 0 && (
+        <div className='mt-1.5 flex flex-wrap items-center gap-1'>
+          {issue.labels.slice(0, 3).map(label => (
+            <IssueLabelBadge key={String(label._id)} label={label} />
+          ))}
+          {issue.labels.length > 3 && (
+            <span className='text-muted-foreground text-xs'>
+              +{issue.labels.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Bottom row: assignees + date */}
       <div className='mt-2 flex items-center justify-between'>
         {onAssigneesChange && currentUserId ? (
@@ -903,6 +923,12 @@ function KanbanCardContent({
               <span className='font-mono'>#{issue.linkedPrs[0].number}</span>
             </Link>
           ) : null}
+          {issue.commentCount > 0 && (
+            <span className='text-muted-foreground flex items-center gap-0.5 text-[11px]'>
+              <MessageSquareMore className='size-3' />
+              {issue.commentCount}
+            </span>
+          )}
           <span className='text-muted-foreground text-[11px]'>
             {formatDateHuman(new Date(issue.updatedAt))}
           </span>

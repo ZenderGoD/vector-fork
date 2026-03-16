@@ -805,6 +805,45 @@ export const listIssuePriorities = query({
   },
 });
 
+export const listIssueLabels = query({
+  args: {
+    orgSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new ConvexError('UNAUTHORIZED');
+    }
+
+    const org = await ctx.db
+      .query('organizations')
+      .withIndex('by_slug', q => q.eq('slug', args.orgSlug))
+      .first();
+
+    if (!org) {
+      throw new ConvexError('ORGANIZATION_NOT_FOUND');
+    }
+
+    const membership = await ctx.db
+      .query('members')
+      .withIndex('by_org_user', q =>
+        q.eq('organizationId', org._id).eq('userId', userId),
+      )
+      .first();
+
+    if (!membership) {
+      throw new ConvexError('FORBIDDEN');
+    }
+
+    const labels = await ctx.db
+      .query('issueLabels')
+      .withIndex('by_organization', q => q.eq('organizationId', org._id))
+      .collect();
+
+    return labels.sort((left, right) => left.name.localeCompare(right.name));
+  },
+});
+
 export const getOrgMember = query({
   args: {
     orgSlug: v.string(),

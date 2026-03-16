@@ -17,6 +17,7 @@ import {
   Trash2,
   Circle,
   ArrowUp,
+  MessageSquareMore,
 } from 'lucide-react';
 import React from 'react';
 
@@ -37,6 +38,7 @@ import type {
   State,
   Priority,
 } from '@/components/issues/issue-selectors';
+import { IssueLabelBadge } from '@/components/issues/issue-label-selector';
 import { api } from '@/convex/_generated/api';
 import { Prettify } from '@/lib/utils';
 import { FunctionReturnType } from 'convex/server';
@@ -273,14 +275,34 @@ export function IssuesTable({
                 />
               </PermissionAware>
 
-              {/* Title */}
+              {/* Title + Labels + Comment count */}
               <div className='min-w-0 flex-1'>
-                <Link
-                  href={`/${orgSlug}/issues/${issue.key}`}
-                  className='hover:text-primary block truncate text-sm font-medium transition-colors'
-                >
-                  {issue.title}
-                </Link>
+                <div className='flex items-center gap-2'>
+                  <Link
+                    href={`/${orgSlug}/issues/${issue.key}`}
+                    className='hover:text-primary truncate text-sm font-medium transition-colors'
+                  >
+                    {issue.title}
+                  </Link>
+                  {issue.labels && issue.labels.length > 0 && (
+                    <div className='hidden items-center gap-1 lg:flex'>
+                      {issue.labels.slice(0, 2).map(label => (
+                        <IssueLabelBadge key={String(label._id)} label={label} />
+                      ))}
+                      {issue.labels.length > 2 && (
+                        <span className='text-muted-foreground text-xs'>
+                          +{issue.labels.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {issue.commentCount > 0 && (
+                    <span className='text-muted-foreground hidden items-center gap-0.5 text-xs sm:flex'>
+                      <MessageSquareMore className='size-3' />
+                      {issue.commentCount}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Team / Project selectors - hidden on mobile */}

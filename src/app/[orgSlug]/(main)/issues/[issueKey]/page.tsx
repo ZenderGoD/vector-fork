@@ -49,6 +49,8 @@ import { IssueActivityFeed } from '@/components/activity/issue-activity-feed';
 import { LinkedDocuments } from '@/components/documents/linked-documents';
 import { CreateIssueDialog } from '@/components/issues/create-issue-dialog';
 import { IssueDevelopmentSection } from '@/components/issues/issue-development-section';
+import { IssueComments } from '@/components/issues/issue-comments';
+import { IssueLabelSelector } from '@/components/issues/issue-label-selector';
 import { useConfirm } from '@/hooks/use-confirm';
 import { toast } from 'sonner';
 import { updateQuery } from '@/lib/optimistic-updates';
@@ -224,6 +226,10 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
     api.organizations.queries.listIssuePriorities,
     resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip',
   );
+  const issueLabels = useQuery(
+    api.organizations.queries.listIssueLabels,
+    resolvedParams ? { orgSlug: resolvedParams.orgSlug } : 'skip',
+  );
 
   const updateTitleMutation = useMutation(
     api.issues.mutations.updateTitle,
@@ -254,8 +260,12 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
   const updateEstimatesMutation = useMutation(
     api.issues.mutations.updateEstimatedTimes,
   );
+  const updateLabelsMutation = useMutation(api.issues.mutations.updateLabels);
   const deleteIssueMutation = useMutation(api.issues.mutations.deleteIssue);
   const linkArtifactByUrl = useAction(api.github.actions.linkArtifactByUrl);
+  const createIssueLabelMutation = useMutation(
+    api.organizations.mutations.createIssueLabel,
+  );
   const changeTeamMutation = useMutation(
     api.issues.mutations.changeTeam,
   ).withOptimisticUpdate((store, args) => {
@@ -591,6 +601,42 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
       toast.error(getGitHubLinkErrorMessage(error));
     } finally {
       setIsLinkingGithub(false);
+    }
+  };
+
+  const handleLabelsChange = (labelIds: string[]) => {
+    if (!issue) return;
+    void updateLabelsMutation({
+      issueId: issue._id,
+      labelIds: labelIds as Id<'issueLabels'>[],
+    }).catch(error => {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update labels',
+      );
+    });
+  };
+
+  const handleCreateLabel = async (name: string) => {
+    if (!resolvedParams) return null;
+
+    try {
+      const result = await createIssueLabelMutation({
+        orgSlug: resolvedParams.orgSlug,
+        name,
+      });
+
+      return {
+        _id: result.id,
+        name: result.name,
+        color: result.color,
+      };
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to create label',
+      );
+      return null;
     }
   };
 
@@ -964,6 +1010,25 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
                   </h1>
                 </PermissionAwareWrapper>
               )}
+
+              <div className='flex flex-wrap items-center gap-2'>
+                <PermissionAwareSelector
+                  orgSlug={resolvedParams.orgSlug}
+                  permission={PERMISSIONS.ISSUE_EDIT}
+                  fallbackMessage="You don't have permission to change issue labels"
+                >
+                  <IssueLabelSelector
+                    labels={issueLabels ?? issue.labels ?? []}
+                    selectedLabelIds={
+                      issue.labels?.map(label => String(label._id)) ?? []
+                    }
+                    onSelectionChange={handleLabelsChange}
+                    onCreateLabel={handleCreateLabel}
+                    displayMode='default'
+                    className='border-none bg-transparent px-0 shadow-none'
+                  />
+                </PermissionAwareSelector>
+              </div>
             </div>
 
             {/* Schedule Info */}
@@ -1158,7 +1223,6 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
               )}
             </div>
 
-            {/* Linked Documents */}
             <IssueDevelopmentSection
               orgSlug={resolvedParams.orgSlug}
               issueId={issue._id}
@@ -1170,6 +1234,14 @@ export default function IssueViewPage({ params }: IssueViewPageProps) {
               mentionType='issue'
               entityId={issue._id}
             />
+
+            {/* Comments */}
+            <div className='mb-6'>
+              <IssueComments
+                orgSlug={resolvedParams.orgSlug}
+                issueId={issue._id}
+              />
+            </div>
 
             {/* Activity Feed */}
             <div>

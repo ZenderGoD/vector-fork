@@ -46,6 +46,7 @@ import {
   type State,
   type Priority,
 } from './issue-selectors';
+import { IssueLabelSelector } from './issue-label-selector';
 import {
   VisibilitySelector,
   type VisibilityState,
@@ -177,6 +178,7 @@ interface CreateIssueDialogContentProps {
     stateId?: string;
     priorityId?: string;
     assigneeIds?: string[];
+    labelIds?: string[];
     [key: string]: unknown;
   };
 }
@@ -205,6 +207,9 @@ export function CreateIssueDialogContent({
     useState(false);
   const [selectedPriority, setSelectedPriority] = useState<string>(
     defaultStates?.priorityId || '',
+  );
+  const [selectedLabels, setSelectedLabels] = useState<string[]>(
+    defaultStates?.labelIds || [],
   );
   const [selectedVisibility, setSelectedVisibility] =
     useState<VisibilityState>('organization');
@@ -235,6 +240,9 @@ export function CreateIssueDialogContent({
       orgSlug,
     },
   );
+  const issueLabelsData = useQuery(api.organizations.queries.listIssueLabels, {
+    orgSlug,
+  });
   const currentUser = useQuery(api.users.currentUser);
 
   // Transform data to maintain frontend compatibility
@@ -252,6 +260,7 @@ export function CreateIssueDialogContent({
     () => (prioritiesData ? withIds(prioritiesData) : []),
     [prioritiesData],
   );
+  const issueLabels = useMemo(() => issueLabelsData ?? [], [issueLabelsData]);
 
   // Auto-infer the format based on selections
   const getEffectiveFormat = (): 'team' | 'project' | 'org' => {
@@ -303,6 +312,9 @@ export function CreateIssueDialogContent({
   };
 
   const createIssueMutation = useMutation(api.issues.mutations.create);
+  const createIssueLabelMutation = useMutation(
+    api.organizations.mutations.createIssueLabel,
+  );
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -339,6 +351,7 @@ export function CreateIssueDialogContent({
           selectedAssignees.length > 0
             ? selectedAssignees.map(id => id as Id<'users'>)
             : [],
+        labelIds: selectedLabels.map(id => id as Id<'issueLabels'>),
         visibility: selectedVisibility,
         parentIssueId: selectedParentIssue
           ? (selectedParentIssue as Id<'issues'>)
@@ -358,6 +371,7 @@ export function CreateIssueDialogContent({
         setSelectedState('');
         setSelectedPriority('');
         setSelectedAssignees([]);
+        setSelectedLabels([]);
         setHasUserInteractedWithAssignees(false);
         setSelectedVisibility('organization');
         setSelectedParentIssue('');
@@ -404,6 +418,27 @@ export function CreateIssueDialogContent({
     return `${orgSlug.toUpperCase()}-${nextNumber}`;
   };
 
+  const handleCreateLabel = async (name: string) => {
+    try {
+      const result = await createIssueLabelMutation({
+        orgSlug,
+        name,
+      });
+
+      return {
+        _id: result.id,
+        name: result.name,
+        color: result.color,
+      };
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to create label',
+      );
+      return null;
+    }
+  };
+
   return (
     <ResponsiveDialog
       open
@@ -439,6 +474,14 @@ export function CreateIssueDialogContent({
                   projects={projects}
                   selectedProject={selectedProject}
                   onProjectSelect={setSelectedProject}
+                />
+
+                <IssueLabelSelector
+                  labels={issueLabels}
+                  selectedLabelIds={selectedLabels}
+                  onSelectionChange={setSelectedLabels}
+                  onCreateLabel={handleCreateLabel}
+                  displayMode='iconWhenUnselected'
                 />
 
                 <IssueSelector
@@ -544,6 +587,7 @@ export interface CreateIssueDialogProps {
     stateId?: string;
     priorityId?: string;
     assigneeIds?: string[];
+    labelIds?: string[];
     [key: string]: unknown;
   };
 }

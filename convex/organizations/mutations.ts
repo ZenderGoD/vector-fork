@@ -499,6 +499,69 @@ export const createIssuePriority = mutation({
   },
 });
 
+const ISSUE_LABEL_COLORS = [
+  '#94a3b8',
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#06b6d4',
+] as const;
+
+function pickIssueLabelColor(name: string) {
+  const normalized = name.trim().toLowerCase();
+  let hash = 0;
+  for (const char of normalized) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return ISSUE_LABEL_COLORS[hash % ISSUE_LABEL_COLORS.length];
+}
+
+export const createIssueLabel = mutation({
+  args: {
+    orgSlug: v.string(),
+    name: v.string(),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const org = await requireOrgAccess(
+      ctx,
+      args.orgSlug,
+      PERMISSIONS.ISSUE_EDIT,
+    );
+    const normalizedName = args.name.trim();
+
+    if (!normalizedName) {
+      throw new ConvexError('INVALID_INPUT');
+    }
+
+    const existingLabels = await ctx.db
+      .query('issueLabels')
+      .withIndex('by_organization', q => q.eq('organizationId', org._id))
+      .collect();
+
+    const duplicate = existingLabels.find(
+      label => label.name.trim().toLowerCase() === normalizedName.toLowerCase(),
+    );
+    if (duplicate) {
+      return {
+        id: duplicate._id,
+        name: duplicate.name,
+        color: duplicate.color ?? pickIssueLabelColor(duplicate.name),
+      } as const;
+    }
+
+    const color = args.color ?? pickIssueLabelColor(normalizedName);
+    const id = await ctx.db.insert('issueLabels', {
+      organizationId: org._id,
+      name: normalizedName,
+      color,
+    });
+
+    return { id, name: normalizedName, color } as const;
+  },
+});
+
 export const updateIssuePriority = mutation({
   args: {
     orgSlug: v.string(),
