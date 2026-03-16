@@ -7,13 +7,13 @@ This package wraps the same auth and Convex-backed workflows used by the app, so
 ## Install
 
 ```bash
-npm install -g @xrehpicx/vector-cli
+npm install -g vcli
 ```
 
 Then verify the install:
 
 ```bash
-vector --help
+vcli --help
 ```
 
 ## Requirements
@@ -35,7 +35,7 @@ By default it uses:
 You can override either with flags:
 
 ```bash
-vector --app-url http://localhost:3000 --convex-url https://<deployment>.convex.cloud --help
+vcli --app-url http://localhost:3000 --convex-url https://<deployment>.convex.cloud --help
 ```
 
 ## First Run
@@ -43,16 +43,16 @@ vector --app-url http://localhost:3000 --convex-url https://<deployment>.convex.
 Sign up or log in:
 
 ```bash
-vector auth signup --email you@example.com --username you --password 'secret'
-vector auth login you@example.com --password 'secret'
-vector auth whoami
+vcli auth signup --email you@example.com --username you --password 'secret'
+vcli auth login you@example.com --password 'secret'
+vcli auth whoami
 ```
 
 Create and select an org:
 
 ```bash
-vector org create --name "Acme" --slug acme
-vector org use acme
+vcli org create --name "Acme" --slug acme
+vcli org use acme
 ```
 
 From there, most commands can rely on the active org. You can always override it with `--org <slug>`.
@@ -68,8 +68,8 @@ Sessions are stored per profile in:
 Examples:
 
 ```bash
-vector --profile work auth login you@example.com --password 'secret'
-vector --profile staging --app-url http://localhost:3001 auth whoami
+vcli --profile work auth login you@example.com --password 'secret'
+vcli --profile staging --app-url http://localhost:3001 auth whoami
 ```
 
 Use profiles when you work across multiple environments or accounts.
@@ -79,63 +79,63 @@ Use profiles when you work across multiple environments or accounts.
 Inspect the current session:
 
 ```bash
-vector auth whoami
-vector org current
-vector org members acme
+vcli auth whoami
+vcli org current
+vcli org members acme
 ```
 
 Discover workspace metadata before mutating:
 
 ```bash
-vector refdata acme
-vector search --org acme "billing"
-vector permission check issue:create --org acme
+vcli refdata acme
+vcli search --org acme "billing"
+vcli permission check issue:create --org acme
 ```
 
 Create core entities:
 
 ```bash
-vector team create --org acme --key eng --name "Engineering"
-vector project create --org acme --key api --name "API" --team eng
-vector issue create --org acme --title "Ship CLI" --project api --team eng
-vector document create --org acme --title "CLI Notes"
-vector folder create --org acme --name "Runbooks"
+vcli team create --org acme --key eng --name "Engineering"
+vcli project create --org acme --key api --name "API" --team eng
+vcli issue create --org acme --title "Ship CLI" --project api --team eng
+vcli document create --org acme --title "CLI Notes"
+vcli folder create --org acme --name "Runbooks"
 ```
 
 Issue workflows:
 
 ```bash
-vector issue list --org acme
-vector issue assignments API-1
-vector issue set-priority API-1 High
-vector issue replace-assignees API-1 "alice,bob"
-vector issue comment API-1 --body "Investigating now."
+vcli issue list --org acme
+vcli issue assignments API-1
+vcli issue set-priority API-1 High
+vcli issue replace-assignees API-1 "alice,bob"
+vcli issue comment API-1 --body "Investigating now."
 ```
 
 Invites and notifications:
 
 ```bash
-vector org invite acme --email teammate@example.com
-vector invite list
-vector invite accept <inviteId>
-vector notification inbox --filter unread
-vector notification unread-count
+vcli org invite acme --email teammate@example.com
+vcli invite list
+vcli invite accept <inviteId>
+vcli notification inbox --filter unread
+vcli notification unread-count
 ```
 
 Settings metadata:
 
 ```bash
-vector priority list acme
-vector state list acme
-vector status list acme
-vector role list acme
+vcli priority list acme
+vcli state list acme
+vcli status list acme
+vcli role list acme
 ```
 
 Platform admin:
 
 ```bash
-vector admin branding
-vector admin signup-policy
+vcli admin branding
+vcli admin signup-policy
 ```
 
 ## JSON Output
@@ -143,8 +143,8 @@ vector admin signup-policy
 Use `--json` for automation and scripts:
 
 ```bash
-vector --json issue list --org acme
-vector --json notification inbox --filter unread
+vcli --json issue list --org acme
+vcli --json notification inbox --filter unread
 ```
 
 For scripts, prefer:
@@ -157,11 +157,11 @@ For scripts, prefer:
 
 `Not logged in`
 
-- Run `vector auth login` or `vector auth signup`.
+- Run `vcli auth login` or `vcli auth signup`.
 
 `Organization slug is required`
 
-- Pass `--org <slug>` or run `vector org use <slug>`.
+- Pass `--org <slug>` or run `vcli org use <slug>`.
 
 Auth errors against the wrong app
 
@@ -180,9 +180,9 @@ Validation errors when creating teams or projects
 Inspect command groups directly:
 
 ```bash
-vector auth --help
-vector org --help
-vector issue --help
-vector notification --help
-vector admin --help
+vcli auth --help
+vcli org --help
+vcli issue --help
+vcli notification --help
+vcli admin --help
 ```

@@ -1,6 +1,6 @@
 ---
 name: vector-cli-usage
-description: Explain how to use the installed Vector CLI in this repository. Use when users ask for CLI onboarding, command examples, auth/profile/org workflows, scripting guidance, or a detailed explanation of how to operate `vector` after installation.
+description: Explain how to use the installed Vector CLI in this repository. Use when users ask for CLI onboarding, command examples, auth/profile/org workflows, scripting guidance, or a detailed explanation of how to operate `vcli` after installation.
 ---
 
 # Vector CLI Usage
@@ -36,14 +36,14 @@ pnpm exec tsx src/cli/index.ts issue --help
 If the user is using the installed binary instead of the repo entrypoint, mirror the same examples with:
 
 ```bash
-vector --help
-vector auth --help
+vcli --help
+vcli auth --help
 ```
 
 Use whichever form matches the user's setup:
 
 - Repo-local examples: `pnpm exec tsx src/cli/index.ts ...`
-- Installed binary examples: `vector ...`
+- Installed binary examples: `vcli ...`
 
 ## What To Explain
 
@@ -92,8 +92,8 @@ Recommend:
 Examples:
 
 ```bash
-vector --profile work auth login you@example.com --password 'secret'
-vector --profile staging --app-url http://localhost:3001 auth whoami
+vcli --profile work auth login you@example.com --password 'secret'
+vcli --profile staging --app-url http://localhost:3001 auth whoami
 ```
 
 ### Org Context
@@ -112,10 +112,10 @@ Explain this clearly because many commands fail without org context.
 Explain auth with these commands first:
 
 ```bash
-vector auth signup --email you@example.com --username yourname --password 'secret'
-vector auth login you@example.com --password 'secret'
-vector auth whoami
-vector auth logout
+vcli auth signup --email you@example.com --username yourname --password 'secret'
+vcli auth login you@example.com --password 'secret'
+vcli auth whoami
+vcli auth logout
 ```
 
 Notes to include:
@@ -128,10 +128,10 @@ Notes to include:
 If the user wants a first-run walkthrough, recommend:
 
 ```bash
-vector auth signup ...
-vector org create --name "Acme" --slug acme
-vector org use acme
-vector auth whoami
+vcli auth signup ...
+vcli org create --name "Acme" --slug acme
+vcli org use acme
+vcli auth whoami
 ```
 
 ## Main Command Groups
@@ -174,20 +174,20 @@ Call out that `admin` commands require platform-admin privileges.
 ### 1. Create And Work Inside A New Org
 
 ```bash
-vector auth signup --email you@example.com --username you --password 'secret'
-vector org create --name "Acme" --slug acme
-vector org use acme
-vector team create --key eng --name "Engineering"
-vector project create --key api --name "API" --team eng
-vector issue create --title "Ship CLI" --project api --team eng
+vcli auth signup --email you@example.com --username you --password 'secret'
+vcli org create --name "Acme" --slug acme
+vcli org use acme
+vcli team create --key eng --name "Engineering"
+vcli project create --key api --name "API" --team eng
+vcli issue create --title "Ship CLI" --project api --team eng
 ```
 
 ### 2. Invite Another User
 
 ```bash
-vector org invite acme --email teammate@example.com
-vector invite list
-vector invite accept <inviteId>
+vcli org invite acme --email teammate@example.com
+vcli invite list
+vcli invite accept <inviteId>
 ```
 
 Explain that invite acceptance happens from the invited user's profile/session.
@@ -195,9 +195,9 @@ Explain that invite acceptance happens from the invited user's profile/session.
 ### 3. Inspect Workspace Metadata Before Writing Commands
 
 ```bash
-vector refdata acme
-vector search --org acme "billing"
-vector permission check issue:create --org acme
+vcli refdata acme
+vcli search --org acme "billing"
+vcli permission check issue:create --org acme
 ```
 
 Use this workflow when the user wants to discover valid project keys, members, states, priorities, or permissions before mutating data.
@@ -207,8 +207,8 @@ Use this workflow when the user wants to discover valid project keys, members, s
 Recommend `--json` for automation:
 
 ```bash
-vector --json issue list --org acme
-vector --json notification inbox --filter unread
+vcli --json issue list --org acme
+vcli --json notification inbox --filter unread
 ```
 
 If the user is scripting, mention:
@@ -230,10 +230,10 @@ If the user is scripting, mention:
 When troubleshooting, start from the actual error and map it to the likely fix:
 
 - `Not logged in`
-  Run `vector auth login` or `vector auth signup`.
+  Run `vcli auth login` or `vcli auth signup`.
 
 - `Organization slug is required`
-  Pass `--org <slug>` or run `vector org use <slug>`.
+  Pass `--org <slug>` or run `vcli org use <slug>`.
 
 - Auth errors against the wrong server
   Make sure `--app-url` matches the running app origin.

@@ -65,6 +65,6 @@ jobs:
           {
             echo "## CLI publish"
             echo
-            echo "- Package: \`@xrehpicx/vector-cli\`"
+            echo "- Package: \`vcli\`"
             echo "- Version: \`${{ steps.version.outputs.version }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
