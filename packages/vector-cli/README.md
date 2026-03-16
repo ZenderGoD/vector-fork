@@ -8,6 +8,9 @@ This package wraps the same auth and Convex-backed workflows used by the app, so
 
 ```bash
 npm install -g @rehpic/vcli
+yarn global add @rehpic/vcli
+pnpm add -g @rehpic/vcli
+bun add -g @rehpic/vcli
 ```
 
 Then verify the install:
