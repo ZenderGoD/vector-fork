@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/menubar.ts'],
+  entry: ['src/index.ts'],
   outDir: 'dist',
   platform: 'node',
   target: 'node20',
@@ -11,5 +11,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   minify: false,
-  external: ['systray2'],
+  external: [],
 });
