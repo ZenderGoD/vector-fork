@@ -143,7 +143,7 @@ export function OrgSidebar({ orgSlug, onNavigate }: OrgSidebarProps) {
               <div
                 key={item.href}
                 className={cn(
-                  'group flex h-8 items-center justify-between gap-2 rounded-md px-2 py-1 text-sm font-medium transition-colors',
+                  'group flex h-8 items-center justify-between gap-2 rounded-md py-1 pr-1 pl-2 text-sm font-medium transition-colors',
                   'hover:bg-foreground/5 text-foreground',
                   {
                     'bg-foreground/5': isActive,
