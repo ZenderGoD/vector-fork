@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/menubar.ts'],
   outDir: 'dist',
   platform: 'node',
   target: 'node20',

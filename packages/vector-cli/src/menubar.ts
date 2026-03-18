@@ -23,15 +23,17 @@ const LIVE_ACTIVITIES_FILE = join(CONFIG_DIR, 'live-activities.json');
 
 // ── Icon ────────────────────────────────────────────────────────────────────
 
-// Base64-encoded Vector icon PNG (18x18, used as tray icon)
+// Vector mark icon (white on transparent, 18x18 PNG)
+const EMBEDDED_ICON =
+  'iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAABmJLR0QA/wD/AP+gvaeTAAABfUlEQVQ4ja2UT0uUURTGf2eWQYaLWgTjjCFKHyOS6BPopk1pKrgWaSGFy8pNQdsgRgT7BG5qlwa5ldqILkWngqCN2a/FnOLy8k4j1IF38Z7nOc89/+6F/2RR51SHgWngFtAGfgL7wFugExHfBiqrc2pXPVPfqS/ze6/+SOzuIJGn9qyjNmvwUXUjOY/7icwkYfkcWT9I7kwVGFK/qOuDRIqYDfVYvVQ6F9VTtVX45tRNdUt9ox6prwq8nX2cBWikfxL4EBGHxaFXgcvJaQJXgPHfYEQcALv0JvtHaAT4WKYeEY8i4gawDYwBn4BupcI94Fop1ACs6cMisAKsZtCFCiWAs1LoAJioiEwBz4EXEfEQ+F4jdB04LIMWsnHNwjevPlMb+X9bnS/w0VzQhVJoODe2Uy2vn+X4u+rFKnA/l2zpHCLLyb3Xj7CWhHW1XYO3iivyZNBps+rnXNCd4tLuZB9P6jLp94wMAXeAm0CL3nT3gS3gdUR8/Xvx/2C/ABkkUg9p4mgDAAAAAElFTkSuQmCC';
+
 function loadIconBase64(): string {
-  // Try to load from assets
+  // Try to load from assets (user may have a custom icon)
   const iconPath = join(CONFIG_DIR, 'assets', 'vector-menubar.png');
   if (existsSync(iconPath)) {
     return readFileSync(iconPath).toString('base64');
   }
-  // Fallback: a minimal 1x1 transparent PNG
-  return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  return EMBEDDED_ICON;
 }
 
 // ── State ───────────────────────────────────────────────────────────────────
@@ -82,14 +84,29 @@ function isBridgeRunning(): { running: boolean; pid?: number } {
 function getSessionInfo(): {
   orgSlug: string;
   appUrl?: string;
+  email?: string;
 } {
   try {
     const session = JSON.parse(
       readFileSync(join(CONFIG_DIR, 'cli-default.json'), 'utf-8'),
     );
+    // Try to extract email from the JWT
+    let email: string | undefined;
+    const jwt = session.cookies?.['__Secure-better-auth.convex_jwt'];
+    if (jwt) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(jwt.split('.')[1], 'base64').toString(),
+        );
+        email = payload.email;
+      } catch {
+        /* ignore */
+      }
+    }
     return {
       orgSlug: session.activeOrgSlug ?? 'oss-lab',
       appUrl: session.appUrl,
+      email,
     };
   } catch {
     return { orgSlug: 'oss-lab' };
@@ -156,7 +173,7 @@ function buildMenu(): {
   }
 
   // Separator
-  items.push({ title: '---', enabled: false });
+  items.push({ title: '<SEPARATOR>', enabled: false });
   idx++;
 
   // Live activities
@@ -180,7 +197,7 @@ function buildMenu(): {
       idx++;
     }
 
-    items.push({ title: '---', enabled: false });
+    items.push({ title: '<SEPARATOR>', enabled: false });
     idx++;
   }
 
@@ -220,22 +237,18 @@ function buildMenu(): {
     idx++;
   }
 
-  items.push({ title: '---', enabled: false });
+  items.push({ title: '<SEPARATOR>', enabled: false });
   idx++;
 
   // Account info
   if (config) {
-    const { orgSlug, appUrl } = getSessionInfo();
-    items.push({
-      title: `Account: ${config.userId.slice(0, 12)}...`,
-      enabled: false,
-    });
+    const { orgSlug, email } = getSessionInfo();
+    const accountLabel = email
+      ? `${email} | ${orgSlug}`
+      : `${config.displayName} | ${orgSlug}`;
+    items.push({ title: accountLabel, enabled: false });
     idx++;
-    if (orgSlug) {
-      items.push({ title: `Org: ${orgSlug}`, enabled: false });
-      idx++;
-    }
-    items.push({ title: '---', enabled: false });
+    items.push({ title: '<SEPARATOR>', enabled: false });
     idx++;
   }
 

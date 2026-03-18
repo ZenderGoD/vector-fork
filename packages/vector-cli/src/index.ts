@@ -2844,7 +2844,6 @@ serviceCommand
       const vcliPath = process.argv[1] ?? 'vcli';
       installLaunchAgent(vcliPath);
       loadLaunchAgent();
-      await launchMenuBar();
       s.stop('Bridge service started.');
     } else {
       // Linux / other: run in foreground
@@ -2873,6 +2872,10 @@ serviceCommand
       const user = await runQuery(client, api.users.currentUser);
       if (!user) throw new Error('Not logged in. Run `vcli auth login` first.');
       config = await setupBridgeDevice(runtime.convexUrl, user._id);
+    }
+
+    if (osPlatform() === 'darwin') {
+      await launchMenuBar();
     }
 
     const bridge = new BridgeService(config);
@@ -2957,10 +2960,6 @@ serviceCommand
     s.start('Starting bridge service...');
     loadLaunchAgent();
     s.stop('Bridge service started');
-
-    s.start('Launching menu bar...');
-    await launchMenuBar();
-    s.stop('Menu bar ready');
 
     console.log('');
     console.log(

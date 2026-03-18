@@ -30,6 +30,11 @@ const LIVE_ACTIVITIES_CACHE = join(CONFIG_DIR, 'live-activities.json');
 const LAUNCHAGENT_DIR = join(homedir(), 'Library', 'LaunchAgents');
 const LAUNCHAGENT_PLIST = join(LAUNCHAGENT_DIR, 'com.vector.bridge.plist');
 const LAUNCHAGENT_LABEL = 'com.vector.bridge';
+const LEGACY_MENUBAR_LAUNCHAGENT_LABEL = 'com.vector.menubar';
+const LEGACY_MENUBAR_LAUNCHAGENT_PLIST = join(
+  LAUNCHAGENT_DIR,
+  `${LEGACY_MENUBAR_LAUNCHAGENT_LABEL}.plist`,
+);
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const COMMAND_POLL_INTERVAL_MS = 5_000;
@@ -415,44 +420,10 @@ export function installLaunchAgent(vcliPath: string): void {
 </dict>
 </plist>`;
 
-  // Also install the menu bar helper LaunchAgent if the binary exists.
-  // Search common locations for the compiled VectorMenuBar binary.
-  const menuBarCandidates = [
-    join(CONFIG_DIR, 'VectorMenuBar'),
-    '/usr/local/bin/VectorMenuBar',
-    join(homedir(), '.local', 'bin', 'VectorMenuBar'),
-  ];
-  const menuBarBinary = menuBarCandidates.find(p => existsSync(p));
-  if (menuBarBinary) {
-    const menuBarPlist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.vector.menubar</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${menuBarBinary}</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <false/>
-</dict>
-</plist>`;
-    const menuBarPlistPath = join(LAUNCHAGENT_DIR, 'com.vector.menubar.plist');
-    writeFileSync(menuBarPlistPath, menuBarPlist);
-    try {
-      execSync(`launchctl load ${menuBarPlistPath}`, { stdio: 'pipe' });
-      console.log('Menu bar helper installed.');
-    } catch {
-      // Already loaded or failed — non-critical
-    }
-  }
-
   if (!existsSync(LAUNCHAGENT_DIR)) {
     mkdirSync(LAUNCHAGENT_DIR, { recursive: true });
   }
+  removeLegacyMenuBarLaunchAgent();
   writeFileSync(LAUNCHAGENT_PLIST, plist);
   console.log(`Installed LaunchAgent: ${LAUNCHAGENT_PLIST}`);
 }
@@ -479,6 +450,7 @@ export function unloadLaunchAgent(): void {
 
 export function uninstallLaunchAgent(): void {
   unloadLaunchAgent();
+  removeLegacyMenuBarLaunchAgent();
   try {
     unlinkSync(LAUNCHAGENT_PLIST);
     console.log('LaunchAgent removed.');
@@ -489,84 +461,110 @@ export function uninstallLaunchAgent(): void {
 
 // ── Menu Bar ────────────────────────────────────────────────────────────────
 
-const MENUBAR_BINARY = join(CONFIG_DIR, 'VectorMenuBar');
-const MENUBAR_SWIFT_URL =
-  'https://raw.githubusercontent.com/xrehpicx/vector/main/cli/macos/VectorMenuBar.swift';
+const MENUBAR_PID_FILE = join(CONFIG_DIR, 'menubar.pid');
 
-/** Ensure the native menu bar binary exists, compiling if needed. */
-async function ensureMenuBarBinary(): Promise<string | null> {
-  if (platform() !== 'darwin') return null;
-  if (existsSync(MENUBAR_BINARY)) return MENUBAR_BINARY;
+function removeLegacyMenuBarLaunchAgent(): void {
+  if (
+    platform() !== 'darwin' ||
+    !existsSync(LEGACY_MENUBAR_LAUNCHAGENT_PLIST)
+  ) {
+    return;
+  }
 
-  // Check for Swift compiler
   try {
-    execSync('which swiftc', { stdio: 'pipe' });
+    execSync(`launchctl unload ${LEGACY_MENUBAR_LAUNCHAGENT_PLIST}`, {
+      stdio: 'pipe',
+    });
   } catch {
-    return null;
+    /* may already be unloaded */
   }
 
-  // Try local source first (dev), then download from GitHub
-  const localSource = join(
-    process.cwd(),
-    'cli',
-    'macos',
-    'VectorMenuBar.swift',
-  );
-  let swiftSource: string;
-
-  if (existsSync(localSource)) {
-    swiftSource = localSource;
-  } else {
-    // Download the Swift source
-    const downloadPath = join(CONFIG_DIR, 'VectorMenuBar.swift');
-    try {
-      execSync(`curl -fsSL "${MENUBAR_SWIFT_URL}" -o "${downloadPath}"`, {
-        stdio: 'pipe',
-        timeout: 15000,
-      });
-      swiftSource = downloadPath;
-    } catch {
-      return null;
-    }
-  }
-
-  // Compile
   try {
-    execSync(
-      `swiftc -o "${MENUBAR_BINARY}" "${swiftSource}" -framework AppKit`,
-      { stdio: 'pipe', timeout: 30000 },
+    unlinkSync(LEGACY_MENUBAR_LAUNCHAGENT_PLIST);
+  } catch {
+    /* already gone */
+  }
+}
+
+/** Find the path to the bundled menubar.js relative to this script. */
+function findMenuBarScript(): string | null {
+  // When installed via npm, menubar.js is alongside index.js in dist/
+  const candidates = [
+    join(import.meta.dirname ?? '', 'menubar.js'),
+    join(import.meta.dirname ?? '', '..', 'dist', 'menubar.js'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+function isKnownMenuBarProcess(pid: number): boolean {
+  try {
+    const command = execSync(`ps -p ${pid} -o args=`, {
+      encoding: 'utf-8',
+      timeout: 3000,
+    });
+    return (
+      command.includes('menubar.js') ||
+      command.includes('menubar.ts') ||
+      command.includes('VectorMenuBar')
     );
-    // Copy icon assets if available
-    const assetsSource = join(swiftSource, '..', 'assets');
-    const assetsDest = join(CONFIG_DIR, 'assets');
-    if (existsSync(assetsSource)) {
-      mkdirSync(assetsDest, { recursive: true });
-      for (const f of ['vector-menubar.png', 'vector-menubar@2x.png']) {
-        const src = join(assetsSource, f);
-        if (existsSync(src))
-          writeFileSync(join(assetsDest, f), readFileSync(src));
-      }
-    }
-    return MENUBAR_BINARY;
   } catch {
-    return null;
+    return false;
+  }
+}
+
+/** Kill any existing menu bar process. */
+function killExistingMenuBar(): void {
+  if (existsSync(MENUBAR_PID_FILE)) {
+    try {
+      const pid = Number(readFileSync(MENUBAR_PID_FILE, 'utf-8').trim());
+      if (Number.isFinite(pid) && pid > 0 && isKnownMenuBarProcess(pid)) {
+        process.kill(pid, 'SIGTERM');
+      }
+    } catch {
+      // Already dead
+    }
+    try {
+      unlinkSync(MENUBAR_PID_FILE);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 export async function launchMenuBar(): Promise<void> {
   if (platform() !== 'darwin') return;
 
-  const binary = await ensureMenuBarBinary();
-  if (!binary) return;
+  removeLegacyMenuBarLaunchAgent();
+
+  const script = findMenuBarScript();
+  if (!script) return;
+
+  // Kill any existing menu bar first
+  killExistingMenuBar();
 
   try {
     const { spawn: spawnChild } = await import('child_process');
-    const child = spawnChild(binary, [], { detached: true, stdio: 'ignore' });
+    const child = spawnChild(process.execPath, [script], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env },
+    });
     child.unref();
-    console.log('Menu bar started.');
+
+    // Save the PID so we can kill it later
+    if (child.pid) {
+      writeFileSync(MENUBAR_PID_FILE, String(child.pid));
+    }
   } catch {
-    // Non-critical
+    // Non-critical — menu bar is optional
   }
+}
+
+export function stopMenuBar(): void {
+  killExistingMenuBar();
 }
 
 // ── Status ──────────────────────────────────────────────────────────────────
@@ -614,6 +612,9 @@ export function getBridgeStatus(): {
 }
 
 export function stopBridge(): boolean {
+  // Also stop the menu bar
+  killExistingMenuBar();
+
   if (!existsSync(PID_FILE)) return false;
   const pid = Number(readFileSync(PID_FILE, 'utf-8').trim());
   try {

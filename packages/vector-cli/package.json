@@ -28,10 +28,12 @@
   },
   "files": [
     "dist",
+    "scripts",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup --config tsup.config.ts"
+    "build": "tsup --config tsup.config.ts",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
