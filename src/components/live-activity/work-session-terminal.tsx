@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import { useTheme } from 'next-themes';
-import { useCachedQuery, useMutation } from '@/lib/convex';
+import { useMutation } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { cn } from '@/lib/utils';
@@ -61,13 +61,15 @@ const CONTROL_PREFIX = '\x00';
 
 export function WorkSessionTerminal({
   snapshot,
-  tmuxSessionName,
+  terminalUrl,
+  terminalToken,
   workSessionId,
   isTerminal,
   fullscreen,
 }: {
   snapshot: string;
-  tmuxSessionName?: string;
+  terminalUrl?: string;
+  terminalToken?: string;
   workSessionId?: Id<'workSessions'>;
   isTerminal?: boolean;
   fullscreen?: boolean;
@@ -75,10 +77,8 @@ export function WorkSessionTerminal({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const dcRef = useRef<RTCDataChannel | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const [rtcConnected, setRtcConnected] = useState(false);
-  const processedSignalsRef = useRef(new Set<string>());
+  const wsRef = useRef<WebSocket | null>(null);
+  const connectedRef = useRef(false);
   const { resolvedTheme } = useTheme();
 
   const terminalTheme = useMemo(
@@ -87,45 +87,10 @@ export function WorkSessionTerminal({
     [resolvedTheme],
   );
 
-  const canUseRtc = Boolean(tmuxSessionName && workSessionId && !isTerminal);
+  const canInteract = Boolean(workSessionId && !isTerminal);
+  const setViewer = useMutation(api.agentBridge.mutations.setTerminalViewer);
 
-  const sendSignal = useMutation(api.agentBridge.mutations.sendTerminalSignal);
-
-  const signals = useCachedQuery(
-    api.agentBridge.queries.getTerminalSignals,
-    canUseRtc && workSessionId
-      ? { workSessionId, for: 'browser' as const }
-      : 'skip',
-  );
-
-  // Process incoming signals from bridge
-  useEffect(() => {
-    if (!signals || !pcRef.current) return;
-
-    for (const signal of signals) {
-      if (processedSignalsRef.current.has(signal._id)) continue;
-      processedSignalsRef.current.add(signal._id);
-
-      if (signal.type === 'answer') {
-        const answer = JSON.parse(signal.data);
-        void pcRef.current
-          .setRemoteDescription(new RTCSessionDescription(answer))
-          .catch(() => {});
-      } else if (signal.type === 'candidate') {
-        const candidate = JSON.parse(signal.data);
-        void pcRef.current
-          .addIceCandidate(
-            new RTCIceCandidate({
-              candidate: candidate.candidate,
-              sdpMid: candidate.sdpMid ?? '0',
-            }),
-          )
-          .catch(() => {});
-      }
-    }
-  }, [signals]);
-
-  // Initialize xterm.js (only once, stable deps)
+  // Initialize xterm.js (once)
   useEffect(() => {
     const container = containerRef.current;
     if (!container || terminalRef.current) return;
@@ -151,33 +116,26 @@ export function WorkSessionTerminal({
     fitAddon.fit();
     terminal.focus();
 
-    // Forward ALL keystrokes to DataChannel
+    // Forward keystrokes to WebSocket
     terminal.onData(data => {
-      const dc = dcRef.current;
-      if (dc && dc.readyState === 'open') {
-        dc.send(data);
-      } else {
-        console.log(
-          '[WebRTC] keystroke dropped, dc state:',
-          dc?.readyState ?? 'null',
-        );
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
       }
     });
-
-    // Also forward binary data (special keys)
     terminal.onBinary(data => {
-      const dc = dcRef.current;
-      if (dc && dc.readyState === 'open') {
-        dc.send(data);
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
       }
     });
 
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.fit();
-      const dc = dcRef.current;
+      const ws = wsRef.current;
       const dims = fitAddon.proposeDimensions();
-      if (dc && dc.readyState === 'open' && dims) {
-        dc.send(
+      if (ws && ws.readyState === WebSocket.OPEN && dims) {
+        ws.send(
           CONTROL_PREFIX +
             JSON.stringify({
               type: 'resize',
@@ -201,52 +159,55 @@ export function WorkSessionTerminal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update theme without recreating terminal
+  // Update theme
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
     terminal.options.theme = terminalTheme;
   }, [terminalTheme]);
 
-  // WebRTC connection — separate from terminal lifecycle
+  // Tell bridge a viewer is active (triggers PTY + tunnel)
   useEffect(() => {
-    if (!canUseRtc || !workSessionId || !tmuxSessionName) return;
+    if (!canInteract || !workSessionId) return;
+
+    const fitAddon = fitAddonRef.current;
+    const dims = fitAddon?.proposeDimensions();
+
+    void setViewer({
+      workSessionId,
+      active: true,
+      cols: dims?.cols ?? 80,
+      rows: dims?.rows ?? 24,
+    });
+
+    return () => {
+      void setViewer({ workSessionId, active: false });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canInteract, workSessionId]);
+
+  // Connect to tunnel WebSocket when URL + token become available
+  useEffect(() => {
+    if (!terminalUrl || !terminalToken || !terminalRef.current) return;
 
     const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
-    if (!terminal || !fitAddon) return;
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
-    pcRef.current = pc;
+    const urlWithToken = `${terminalUrl}?token=${encodeURIComponent(terminalToken)}`;
+    console.log('[Terminal] Connecting to', terminalUrl);
+    const ws = new WebSocket(urlWithToken);
+    wsRef.current = ws;
 
-    const dc = pc.createDataChannel('terminal', { ordered: true });
-    dcRef.current = dc;
-
-    dc.binaryType = 'arraybuffer';
-
-    // Connection state logging
-    pc.onconnectionstatechange = () => {
-      console.log('[WebRTC] connection:', pc.connectionState);
-    };
-    pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC] ICE:', pc.iceConnectionState);
-    };
-    pc.onicegatheringstatechange = () => {
-      console.log('[WebRTC] ICE gathering:', pc.iceGatheringState);
-    };
-
-    dc.onopen = () => {
-      console.log('[WebRTC] DataChannel open');
-      setRtcConnected(true);
+    ws.onopen = () => {
+      console.log('[Terminal] Connected');
+      connectedRef.current = true;
       terminal.clear();
       terminal.focus();
 
-      // Send initial resize so PTY matches browser dimensions
-      const dims = fitAddon.proposeDimensions();
+      // Send initial resize
+      const dims = fitAddon?.proposeDimensions();
       if (dims) {
-        dc.send(
+        ws.send(
           CONTROL_PREFIX +
             JSON.stringify({
               type: 'resize',
@@ -257,77 +218,39 @@ export function WorkSessionTerminal({
       }
     };
 
-    dc.onmessage = event => {
-      terminal.write(
-        typeof event.data === 'string'
-          ? event.data
-          : new Uint8Array(event.data),
-      );
-    };
-
-    dc.onclose = () => {
-      console.log('[WebRTC] DataChannel closed');
-      setRtcConnected(false);
-      dcRef.current = null;
-    };
-
-    dc.onerror = event => {
-      console.error('[WebRTC] DataChannel error:', event);
-    };
-
-    pc.onicecandidate = event => {
-      if (event.candidate) {
-        void sendSignal({
-          workSessionId,
-          from: 'browser',
-          type: 'candidate',
-          data: JSON.stringify({
-            candidate: event.candidate.candidate,
-            sdpMid: event.candidate.sdpMid,
-          }),
-        });
+    ws.onmessage = event => {
+      if (typeof event.data === 'string') {
+        terminal.write(event.data);
       }
     };
 
-    // Create and send offer
-    void (async () => {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+    ws.onclose = () => {
+      console.log('[Terminal] Disconnected');
+      connectedRef.current = false;
+      wsRef.current = null;
+    };
 
-      await sendSignal({
-        workSessionId,
-        from: 'browser',
-        type: 'offer',
-        data: JSON.stringify({
-          sdp: offer.sdp,
-          type: offer.type,
-        }),
-      });
-    })();
+    ws.onerror = () => {
+      console.log('[Terminal] WebSocket error');
+    };
 
     return () => {
-      dc.close();
-      pc.close();
-      dcRef.current = null;
-      pcRef.current = null;
-      setRtcConnected(false);
+      ws.close();
+      wsRef.current = null;
+      connectedRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canUseRtc, workSessionId, tmuxSessionName]);
+  }, [terminalUrl, terminalToken]);
 
-  // Render snapshots only when NOT connected via WebRTC
+  // Render snapshot fallback when not connected via WebSocket
   useEffect(() => {
-    if (rtcConnected) return;
+    if (connectedRef.current) return;
     const terminal = terminalRef.current;
-    if (!terminal) return;
+    if (!terminal || !snapshot) return;
 
     terminal.write('\u001b[2J\u001b[H');
-    if (snapshot.trim()) {
-      // For snapshot mode, manually convert line endings
-      terminal.write(snapshot.replace(/\r?\n/g, '\r\n'));
-    }
+    terminal.write(snapshot.replace(/\r?\n/g, '\r\n'));
     fitAddonRef.current?.fit();
-  }, [snapshot, rtcConnected]);
+  }, [snapshot]);
 
   return (
     <div

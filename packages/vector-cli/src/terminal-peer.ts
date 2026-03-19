@@ -1,22 +1,26 @@
 /**
- * WebRTC-based terminal peer for the bridge.
+ * Interactive terminal relay for the bridge.
  *
- * Uses Convex for signaling (via ConvexClient reactive subscriptions) and
- * node-datachannel for the P2P DataChannel connection.
- * When a browser sends an offer, the bridge creates a PeerConnection,
- * spawns a PTY running `tmux attach-session`, and pipes I/O over the DataChannel.
+ * For each active work session with a viewer:
+ * 1. Spawns a PTY running `tmux attach-session` (node-pty)
+ * 2. Starts a local WebSocket server (ws) that pipes PTY I/O
+ * 3. Opens a public tunnel (tunnelmole) so any device can connect
+ * 4. Writes the tunnel URL to Convex so the frontend knows where to connect
+ *
+ * Pure JS — no binary distribution needed.
  */
 
+import { createServer, type Server } from 'node:http';
+import { WebSocketServer, WebSocket } from 'ws';
 import { ConvexClient } from 'convex/browser';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
-import { PeerConnection, type DataChannel } from 'node-datachannel';
 import * as pty from 'node-pty';
-import { execFileSync } from 'child_process';
 import { existsSync } from 'fs';
+import { randomUUID } from 'crypto';
+import localtunnel from 'localtunnel';
 
 function findTmuxPath(): string {
-  // Check common paths directly (fastest, no subprocess)
   for (const p of [
     '/opt/homebrew/bin/tmux',
     '/usr/local/bin/tmux',
@@ -24,15 +28,7 @@ function findTmuxPath(): string {
   ]) {
     if (existsSync(p)) return p;
   }
-
-  // Fallback: ask the shell
-  try {
-    return execFileSync('/usr/bin/env', ['which', 'tmux'], {
-      encoding: 'utf-8',
-    }).trim();
-  } catch {
-    return 'tmux';
-  }
+  return 'tmux';
 }
 
 interface TerminalPeerConfig {
@@ -41,33 +37,48 @@ interface TerminalPeerConfig {
   convexUrl: string;
 }
 
-interface ActiveSession {
-  peer: PeerConnection;
-  channel: DataChannel | null;
-  ptyProcess: pty.IPty | null;
+interface ActiveTerminal {
+  ptyProcess: pty.IPty;
+  httpServer: Server;
+  wss: WebSocketServer;
+  tunnel: { close: () => void };
+  tunnelUrl: string;
+  token: string;
   workSessionId: string;
+  tmuxSessionName: string;
+  port: number;
 }
 
 function ts() {
   return new Date().toISOString().slice(11, 19);
 }
 
+// Find an available port
+function findPort(start = 9100): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const addr = srv.address();
+      const port = typeof addr === 'object' && addr ? addr.port : start;
+      srv.close(() => resolve(port));
+    });
+    srv.on('error', reject);
+  });
+}
+
 export class TerminalPeerManager {
   private config: TerminalPeerConfig;
   private client: ConvexClient;
-  private sessions = new Map<string, ActiveSession>();
+  private terminals = new Map<string, ActiveTerminal>();
+  private failedSessions = new Set<string>();
+  private pendingStops = new Map<string, ReturnType<typeof setTimeout>>();
   private unsubscribers = new Map<string, () => void>();
-  private processedSignals = new Set<string>();
 
   constructor(config: TerminalPeerConfig) {
     this.config = config;
     this.client = new ConvexClient(config.convexUrl);
   }
 
-  /**
-   * Start watching for WebRTC offers on a specific work session.
-   * Called when a live activity has an active tmux session.
-   */
   watchSession(
     workSessionId: Id<'workSessions'>,
     tmuxSessionName: string,
@@ -75,36 +86,48 @@ export class TerminalPeerManager {
     if (this.unsubscribers.has(workSessionId)) return;
 
     const unsub = this.client.onUpdate(
-      api.agentBridge.bridgePublic.getTerminalSignals,
+      api.agentBridge.bridgePublic.getWorkSessionTerminalState,
       {
         deviceId: this.config.deviceId as Id<'agentDevices'>,
         deviceSecret: this.config.deviceSecret,
         workSessionId,
       },
-      signals => {
-        if (!signals || signals.length === 0) return;
+      state => {
+        if (!state) return;
 
-        for (const signal of signals) {
-          const signalKey = signal._id;
-          if (this.processedSignals.has(signalKey)) continue;
-          this.processedSignals.add(signalKey);
+        const terminal = this.terminals.get(workSessionId);
 
-          if (signal.type === 'offer') {
-            console.log(`[${ts()}] WebRTC offer for ${tmuxSessionName}`);
-            void this.handleOffer(workSessionId, tmuxSessionName, signal.data);
-          } else if (signal.type === 'candidate') {
-            const session = this.sessions.get(workSessionId);
-            if (session) {
-              try {
-                const candidate = JSON.parse(signal.data);
-                session.peer.addRemoteCandidate(
-                  candidate.candidate,
-                  candidate.sdpMid ?? '0',
-                );
-              } catch {
-                // ignore malformed candidates
-              }
-            }
+        if (
+          state.terminalViewerActive &&
+          !terminal &&
+          !this.failedSessions.has(workSessionId)
+        ) {
+          // Cancel any pending stop
+          const pendingStop = this.pendingStops.get(workSessionId);
+          if (pendingStop) {
+            clearTimeout(pendingStop);
+            this.pendingStops.delete(workSessionId);
+          }
+
+          console.log(`[${ts()}] Viewer active for ${tmuxSessionName}`);
+          void this.startTerminal(
+            workSessionId,
+            tmuxSessionName,
+            state.terminalCols,
+            state.terminalRows,
+          );
+        } else if (!state.terminalViewerActive && terminal) {
+          // Debounce stop to handle React strict mode double-renders
+          if (!this.pendingStops.has(workSessionId)) {
+            this.pendingStops.set(
+              workSessionId,
+              setTimeout(() => {
+                this.pendingStops.delete(workSessionId);
+                console.log(`[${ts()}] Viewer inactive for ${tmuxSessionName}`);
+                this.stopTerminal(workSessionId);
+                this.failedSessions.delete(workSessionId);
+              }, 2000),
+            );
           }
         }
       },
@@ -118,231 +141,174 @@ export class TerminalPeerManager {
       unsub();
       this.unsubscribers.delete(workSessionId);
     }
-    this.cleanupSession(workSessionId);
+    this.stopTerminal(workSessionId);
   }
 
-  private async handleOffer(
+  private async startTerminal(
     workSessionId: string,
     tmuxSessionName: string,
-    offerData: string,
+    cols: number,
+    rows: number,
   ): Promise<void> {
-    // Clean up existing session if re-negotiating
-    this.cleanupSession(workSessionId);
+    if (this.terminals.has(workSessionId)) return;
 
-    const offer = JSON.parse(offerData);
-    const peer = new PeerConnection('bridge', {
-      iceServers: ['stun:stun.l.google.com:19302'],
-    });
+    const tmuxBin = findTmuxPath();
 
-    const session: ActiveSession = {
-      peer,
-      channel: null,
-      ptyProcess: null,
-      workSessionId,
-    };
-    this.sessions.set(workSessionId, session);
-
-    // Log connection state changes
-    peer.onStateChange(state => {
-      console.log(
-        `[${ts()}] PeerConnection state: ${state} (${tmuxSessionName})`,
-      );
-    });
-
-    peer.onGatheringStateChange(state => {
-      console.log(`[${ts()}] ICE gathering: ${state} (${tmuxSessionName})`);
-    });
-
-    // Send ICE candidates to Convex
-    peer.onLocalCandidate((candidate, sdpMid) => {
-      console.log(`[${ts()}] Local ICE candidate: ${sdpMid}`);
-      void this.sendSignal(workSessionId, 'candidate', { candidate, sdpMid });
-    });
-
-    // Handle incoming data channel from browser
-    peer.onDataChannel(dc => {
-      console.log(`[${ts()}] onDataChannel received: ${dc.getLabel()}`);
-      session.channel = dc;
-      this.setupDataChannel(session, tmuxSessionName, dc);
-    });
-
-    // Set remote description (the offer from browser)
-    console.log(
-      `[${ts()}] Setting remote description (offer type: ${offer.type})`,
-    );
-    peer.setRemoteDescription(offer.sdp, offer.type);
-
-    // Wait for ICE gathering to complete
-    await new Promise<void>(resolve => {
-      const checkGathering = () => {
-        const state = peer.gatheringState();
-        if (state === 'complete') {
-          resolve();
-        } else {
-          setTimeout(checkGathering, 100);
-        }
-      };
-      // Also resolve after 3 seconds max
-      setTimeout(resolve, 3000);
-      checkGathering();
-    });
-
-    const localDesc = peer.localDescription();
-    if (localDesc) {
-      console.log(
-        `[${ts()}] Sending answer (type: ${localDesc.type}, sdp length: ${localDesc.sdp.length})`,
-      );
-      await this.sendSignal(workSessionId, 'answer', {
-        sdp: localDesc.sdp,
-        type: localDesc.type,
-      });
-      console.log(`[${ts()}] WebRTC answer sent for ${tmuxSessionName}`);
-    } else {
-      console.error(
-        `[${ts()}] No local description available after setting remote offer`,
-      );
-    }
-  }
-
-  private async sendSignal(
-    workSessionId: string,
-    type: 'answer' | 'candidate',
-    data: Record<string, unknown>,
-  ): Promise<void> {
     try {
+      // 1. Find a free port
+      const port = await findPort();
+
+      // 2. Spawn PTY
+      console.log(
+        `[${ts()}] Spawning PTY: ${tmuxBin} attach-session -t ${tmuxSessionName}`,
+      );
+      const ptyProcess = pty.spawn(
+        tmuxBin,
+        ['attach-session', '-t', tmuxSessionName],
+        {
+          name: 'xterm-256color',
+          cols: Math.max(cols, 10),
+          rows: Math.max(rows, 4),
+          cwd: process.env.HOME ?? '/',
+          env: { ...process.env, TERM: 'xterm-256color' },
+        },
+      );
+      console.log(`[${ts()}] PTY started for ${tmuxSessionName}`);
+
+      // 3. Generate auth token
+      const token = randomUUID();
+
+      // 4. Start WebSocket server with auth
+      const httpServer = createServer();
+      const wss = new WebSocketServer({ server: httpServer });
+
+      wss.on('connection', (ws, req) => {
+        // Validate token from query string
+        const url = new URL(req.url ?? '/', `http://localhost`);
+        const clientToken = url.searchParams.get('token');
+        if (clientToken !== token) {
+          console.log(`[${ts()}] Rejected unauthorized WebSocket connection`);
+          ws.close(4401, 'Unauthorized');
+          return;
+        }
+
+        console.log(
+          `[${ts()}] WebSocket client connected (${tmuxSessionName})`,
+        );
+
+        // PTY output → WebSocket
+        const dataHandler = ptyProcess.onData(data => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(data);
+          }
+        });
+
+        // WebSocket input → PTY
+        ws.on('message', msg => {
+          const str = msg.toString();
+
+          // Check for resize control messages
+          if (str.startsWith('\x00{')) {
+            try {
+              const parsed = JSON.parse(str.slice(1));
+              if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
+                ptyProcess.resize(
+                  Math.max(parsed.cols, 10),
+                  Math.max(parsed.rows, 4),
+                );
+                return;
+              }
+            } catch {
+              // not a control message
+            }
+          }
+
+          ptyProcess.write(str);
+        });
+
+        ws.on('close', () => {
+          console.log(
+            `[${ts()}] WebSocket client disconnected (${tmuxSessionName})`,
+          );
+          dataHandler.dispose();
+        });
+      });
+
+      await new Promise<void>(resolve => {
+        httpServer.listen(port, '127.0.0.1', resolve);
+      });
+      console.log(`[${ts()}] WS server on port ${port}`);
+
+      // 5. Open tunnel
+      console.log(`[${ts()}] Opening tunnel...`);
+      const tunnel = await localtunnel({ port });
+      const tunnelUrl = tunnel.url;
+      console.log(`[${ts()}] Tunnel: ${tunnelUrl}`);
+
+      // Convert https:// to wss:// for WebSocket
+      const wsUrl = tunnelUrl.replace(/^https?:\/\//, 'wss://');
+
+      const terminal: ActiveTerminal = {
+        ptyProcess,
+        httpServer,
+        wss,
+        tunnel,
+        tunnelUrl: wsUrl,
+        token,
+        workSessionId,
+        tmuxSessionName,
+        port,
+      };
+      this.terminals.set(workSessionId, terminal);
+
+      // 6. Write tunnel URL + token to Convex
       await this.client.mutation(
-        api.agentBridge.bridgePublic.sendTerminalSignal,
+        api.agentBridge.bridgePublic.updateWorkSessionTerminalUrl,
         {
           deviceId: this.config.deviceId as Id<'agentDevices'>,
           deviceSecret: this.config.deviceSecret,
           workSessionId: workSessionId as Id<'workSessions'>,
-          type,
-          data: JSON.stringify(data),
+          terminalUrl: wsUrl,
+          terminalToken: token,
         },
       );
+
+      ptyProcess.onExit(() => {
+        console.log(`[${ts()}] PTY exited for ${tmuxSessionName}`);
+        this.stopTerminal(workSessionId);
+      });
     } catch (err) {
-      console.error(`[${ts()}] Failed to send signal:`, err);
+      console.error(`[${ts()}] Failed to start terminal:`, err);
+      this.failedSessions.add(workSessionId);
     }
   }
 
-  private setupDataChannel(
-    session: ActiveSession,
-    tmuxSessionName: string,
-    dc: DataChannel,
-  ): void {
-    dc.onOpen(() => {
-      console.log(`[${ts()}] DataChannel open for ${tmuxSessionName}`);
-
-      try {
-        const tmuxBin = findTmuxPath();
-        const ptyProcess = pty.spawn(
-          tmuxBin,
-          ['attach-session', '-t', tmuxSessionName],
-          {
-            name: 'xterm-256color',
-            cols: 80,
-            rows: 24,
-            cwd: process.env.HOME ?? '/',
-            env: {
-              ...process.env,
-              TERM: 'xterm-256color',
-              PATH: ['/opt/homebrew/bin', '/usr/local/bin', process.env.PATH]
-                .filter(Boolean)
-                .join(':'),
-            },
-          },
-        );
-        session.ptyProcess = ptyProcess;
-
-        // PTY output → DataChannel
-        ptyProcess.onData(data => {
-          try {
-            if (dc.isOpen()) {
-              dc.sendMessage(data);
-            }
-          } catch {
-            // channel closed
-          }
-        });
-
-        ptyProcess.onExit(() => {
-          console.log(`[${ts()}] PTY exited for ${tmuxSessionName}`);
-          try {
-            dc.close();
-          } catch {
-            // ignore
-          }
-          this.cleanupSession(session.workSessionId);
-        });
-      } catch (err) {
-        console.error(`[${ts()}] Failed to spawn PTY:`, err);
-        try {
-          dc.close();
-        } catch {
-          // ignore
-        }
-      }
-    });
-
-    // DataChannel input → PTY stdin
-    dc.onMessage(msg => {
-      if (!session.ptyProcess) return;
-
-      const str =
-        typeof msg === 'string'
-          ? msg
-          : Buffer.from(msg as unknown as ArrayBuffer).toString();
-
-      // Check for control messages (resize)
-      if (str.startsWith('\x00{')) {
-        try {
-          const parsed = JSON.parse(str.slice(1));
-          if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-            session.ptyProcess.resize(
-              Math.max(parsed.cols, 10),
-              Math.max(parsed.rows, 4),
-            );
-            return;
-          }
-        } catch {
-          // Not a control message
-        }
-      }
-
-      session.ptyProcess.write(str);
-    });
-
-    dc.onClosed(() => {
-      console.log(`[${ts()}] DataChannel closed for ${tmuxSessionName}`);
-      this.cleanupSession(session.workSessionId);
-    });
-
-    dc.onError(err => {
-      console.error(`[${ts()}] DataChannel error:`, err);
-      this.cleanupSession(session.workSessionId);
-    });
-  }
-
-  private cleanupSession(workSessionId: string): void {
-    const session = this.sessions.get(workSessionId);
-    if (!session) return;
+  private stopTerminal(workSessionId: string): void {
+    const terminal = this.terminals.get(workSessionId);
+    if (!terminal) return;
 
     try {
-      session.ptyProcess?.kill();
+      terminal.ptyProcess.kill();
     } catch {
-      // ignore
+      /* */
     }
     try {
-      session.channel?.close();
+      terminal.tunnel.close();
     } catch {
-      // ignore
+      /* */
     }
     try {
-      session.peer.close();
+      terminal.wss.close();
     } catch {
-      // ignore
+      /* */
     }
-    this.sessions.delete(workSessionId);
+    try {
+      terminal.httpServer.close();
+    } catch {
+      /* */
+    }
+    this.terminals.delete(workSessionId);
+    console.log(`[${ts()}] Terminal stopped for ${terminal.tmuxSessionName}`);
   }
 
   stop(): void {
@@ -350,13 +316,13 @@ export class TerminalPeerManager {
       try {
         unsub();
       } catch {
-        // ignore
+        /* */
       }
     }
     this.unsubscribers.clear();
 
-    for (const id of this.sessions.keys()) {
-      this.cleanupSession(id);
+    for (const id of this.terminals.keys()) {
+      this.stopTerminal(id);
     }
 
     void this.client.close();
