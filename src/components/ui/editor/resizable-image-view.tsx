@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
+import { cn } from '@/lib/utils';
 
 const MIN_WIDTH = 80;
 
@@ -115,7 +116,11 @@ export function ResizableImageView({
     >
       <div
         ref={containerRef}
-        className={`resizable-image-container${selected ? 'selected' : ''}${resizing ? 'resizing' : ''}`}
+        className={cn(
+          'resizable-image-container',
+          selected && 'selected',
+          resizing && 'resizing',
+        )}
         style={{
           display: 'inline-block',
           position: 'relative',
