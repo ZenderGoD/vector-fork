@@ -547,6 +547,7 @@ export function IssuesKanban({
               issue={activeIssue}
               orgSlug={orgSlug}
               isDragging
+              kanbanBorderTags={kanbanBorderTags}
             />
           </div>
         ) : null}
@@ -771,8 +772,10 @@ function KanbanCard({
     },
   });
   const cardRef = React.useRef<HTMLDivElement | null>(null);
+  const currentKanbanBorderColor: KanbanBorderColor | '' =
+    normalizeKanbanBorderColor(issue.kanbanBorderTag) ?? '';
   const [displayKanbanBorderColor, setOptimisticKanbanBorderColor] =
-    useOptimisticValue(issue.kanbanBorderTag ?? '');
+    useOptimisticValue<KanbanBorderColor | ''>(currentKanbanBorderColor);
   const [isBorderPickerOpen, setIsBorderPickerOpen] = useState(false);
 
   const setRefs = React.useCallback(

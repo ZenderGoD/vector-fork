@@ -21,6 +21,7 @@ import { ISSUE_STATE_DEFAULTS, PROJECT_STATUS_DEFAULTS } from '@/lib/defaults';
 import {
   getKanbanBorderTagDisplayName,
   getKanbanBorderTagSlotLabel,
+  type KanbanBorderTagSetting,
 } from '@/lib/kanban-border-tags';
 
 type IssueStateType = 'backlog' | 'todo' | 'in_progress' | 'done' | 'canceled';
@@ -55,12 +56,6 @@ interface Priority {
   weight: number;
   color: string | null;
   icon: string | null;
-}
-
-interface KanbanBorderTag {
-  id: string;
-  name: string;
-  color: string;
 }
 
 interface StatesPageContentProps {
@@ -584,21 +579,11 @@ export function StatesPageContent({ orgSlug }: StatesPageContentProps) {
           {kanbanBorderTags?.map(tag => (
             <KanbanBorderTagsManagementPopover
               key={tag.id}
-              tag={tag as KanbanBorderTag}
+              tag={tag as KanbanBorderTagSetting}
               onSave={data => {
                 void updateKanbanBorderTag({
                   orgSlug,
-                  tagId: data.id as
-                    | 'tag-1'
-                    | 'tag-2'
-                    | 'tag-3'
-                    | 'tag-4'
-                    | 'tag-5'
-                    | 'tag-6'
-                    | 'tag-7'
-                    | 'tag-8'
-                    | 'tag-9'
-                    | 'tag-10',
+                  tagId: data.id,
                   name: data.name,
                   color: data.color,
                 });

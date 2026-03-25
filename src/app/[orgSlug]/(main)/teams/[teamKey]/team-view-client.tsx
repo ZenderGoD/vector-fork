@@ -33,7 +33,10 @@ import { UserAvatar } from '@/components/user-avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IssuesTable } from '@/components/issues/issues-table';
 import { IssuesKanban } from '@/components/issues/issues-kanban';
-import type { KanbanBorderColor } from '@/components/issues/kanban-border-colors';
+import {
+  normalizeKanbanBorderColor,
+  type KanbanBorderColor,
+} from '@/components/issues/kanban-border-colors';
 import { ProjectsTable } from '@/components/projects/projects-table';
 import { TeamActivityFeed } from '@/components/activity/team-activity-feed';
 import { LinkedDocuments } from '@/components/documents/linked-documents';
@@ -544,7 +547,8 @@ export default function TeamViewClient({
       current =>
         updateIssueRows(current, String(args.issueId), row => ({
           ...row,
-          kanbanBorderTag: args.borderColor ?? undefined,
+          kanbanBorderTag:
+            normalizeKanbanBorderColor(args.borderColor) ?? undefined,
           kanbanBorderColor: undefined,
         })),
     );

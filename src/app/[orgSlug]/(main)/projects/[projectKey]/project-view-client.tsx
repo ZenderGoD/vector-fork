@@ -44,7 +44,10 @@ import {
   type VisibilityState,
 } from '@/components/ui/visibility-selector';
 import { IssuesKanban } from '@/components/issues/issues-kanban';
-import type { KanbanBorderColor } from '@/components/issues/kanban-border-colors';
+import {
+  normalizeKanbanBorderColor,
+  type KanbanBorderColor,
+} from '@/components/issues/kanban-border-colors';
 import { IssuesTable } from '@/components/issues/issues-table';
 import { CreateIssueDialog } from '@/components/issues/create-issue-dialog';
 import { TableSkeleton, KanbanSkeleton } from '@/components/ui/table-skeleton';
@@ -509,7 +512,8 @@ export default function ProjectViewClient({
       current =>
         updateIssueRows(current, String(args.issueId), row => ({
           ...row,
-          kanbanBorderTag: args.borderColor ?? undefined,
+          kanbanBorderTag:
+            normalizeKanbanBorderColor(args.borderColor) ?? undefined,
           kanbanBorderColor: undefined,
         })),
     );
