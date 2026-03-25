@@ -103,6 +103,7 @@ export type AssistantComposerSubmitOptions = {
   attachments: AssistantComposerAttachment[];
   model?: string;
   skipConfirmations: boolean;
+  thinkingLevel?: 'low' | 'medium' | 'high';
 };
 
 export type AssistantComposerHandle = {
@@ -177,16 +178,25 @@ export const AssistantComposer = forwardRef<
   );
 
   const modelOptions: ModelOption[] = useMemo(() => {
+    const adminModelList = adminModels?.models;
+    const adminDefault = adminModels?.defaultModel;
+
+    const defaultName = adminDefault
+      ? adminModelList?.find(m => m.modelId === adminDefault)?.name
+      : undefined;
+
     const workspaceDefault: ModelOption = {
       value: '',
       label: 'Workspace default',
-      hint: 'Use the workspace OpenRouter default',
+      hint: defaultName
+        ? `Uses ${defaultName}`
+        : 'Use the workspace OpenRouter default',
     };
 
-    if (adminModels && adminModels.length > 0) {
+    if (adminModelList && adminModelList.length > 0) {
       return [
         workspaceDefault,
-        ...adminModels.map(m => ({
+        ...adminModelList.map(m => ({
           value: m.modelId,
           label: m.name,
           hint: m.hint ?? m.modelId,
@@ -342,21 +352,11 @@ export const AssistantComposer = forwardRef<
 
   const handleSubmit = useCallback(
     async (text: string, mentions: MentionRef[]) => {
-      // Prepend thinking instruction based on level
-      let finalText = text;
-      if (thinkingLevel !== 'off' && text.trim()) {
-        const thinkingInstructions = {
-          low: '[Think briefly before responding]',
-          medium: '[Think step-by-step before responding]',
-          high: '[Think deeply and exhaustively before responding, considering all angles]',
-        };
-        finalText = `${thinkingInstructions[thinkingLevel]}\n\n${text}`;
-      }
-
-      const shouldClear = await onSubmit(finalText, mentions, {
+      const shouldClear = await onSubmit(text, mentions, {
         attachments,
         model: model.trim() || undefined,
         skipConfirmations,
+        thinkingLevel: thinkingLevel !== 'off' ? thinkingLevel : undefined,
       });
 
       if (shouldClear !== false) {
@@ -536,7 +536,7 @@ export const AssistantComposer = forwardRef<
               iconButtonClass,
               'ml-auto',
               skipConfirmations &&
-                'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400',
+                'bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400',
             )}
             onClick={handleToggleSkipConfirmations}
           >
