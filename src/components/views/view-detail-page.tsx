@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { RichEditor } from '@/components/ui/rich-editor';
 import { IssuesTable } from '@/components/issues/issues-table';
 import { IssuesKanban } from '@/components/issues/issues-kanban';
+import type { KanbanBorderColor } from '@/components/issues/kanban-border-colors';
 import { IssuesTimeline } from '@/components/issues/issues-timeline';
 import {
   TeamSelector,
@@ -108,6 +109,9 @@ export function ViewDetailPage() {
   const updateAssignees = useMutation(api.issues.mutations.updateAssignees);
   const changeTeam = useMutation(api.issues.mutations.changeTeam);
   const changeProject = useMutation(api.issues.mutations.changeProject);
+  const changeKanbanBorderColor = useMutation(
+    api.issues.mutations.changeKanbanBorderColor,
+  );
   const deleteIssue = useMutation(api.issues.mutations.deleteIssue);
   const changeAssignmentState = useMutation(
     api.issues.mutations.changeAssignmentState,
@@ -197,6 +201,17 @@ export function ViewDetailPage() {
     void changeProject({
       issueId: issueId as Id<'issues'>,
       projectId: projectId as Id<'projects'>,
+    });
+  };
+
+  const handleKanbanBorderColorChange = (
+    issueId: string,
+    borderColor: KanbanBorderColor | '',
+  ) => {
+    if (!user) return;
+    void changeKanbanBorderColor({
+      issueId: issueId as Id<'issues'>,
+      borderColor: borderColor || null,
     });
   };
 
@@ -538,6 +553,7 @@ export function ViewDetailPage() {
                   onAssigneesChange={handleAssigneesChange}
                   onTeamChange={handleTeamChange}
                   onProjectChange={handleProjectChange}
+                  onKanbanBorderColorChange={handleKanbanBorderColorChange}
                   onDelete={handleDelete}
                   deletePending={deletePending}
                   currentUserId={currentUserId}
